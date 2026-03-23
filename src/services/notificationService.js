@@ -1,29 +1,30 @@
 import { supabase } from '../config/supabase';
 
 export async function getNotifications(userId) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(20);
-
-  if (error) throw error;
-  return data || [];
+  const allNotifs = JSON.parse(localStorage.getItem('agroai_notifications') || '[]');
+  const userNotifs = allNotifs.filter(n => n.user_id === userId);
+  
+  if (userNotifs.length > 0) {
+    return userNotifs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+  
+  return [];
 }
 
 export async function createNotification(userId, message) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .insert([{
-      user_id: userId,
-      message
-    }])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  const allNotifs = JSON.parse(localStorage.getItem('agroai_notifications') || '[]');
+  
+  const newNotif = {
+    id: `notif-${Date.now()}`,
+    user_id: userId,
+    message,
+    created_at: new Date().toISOString()
+  };
+  
+  allNotifs.push(newNotif);
+  localStorage.setItem('agroai_notifications', JSON.stringify(allNotifs));
+  
+  return newNotif;
 }
 
 export function getDefaultNotifications() {

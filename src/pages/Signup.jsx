@@ -10,6 +10,8 @@ export default function Signup() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -99,33 +101,53 @@ export default function Signup() {
 
           <div className="form-group">
             <label className="form-label" htmlFor="signup-password">{t('auth_password')}</label>
-            <input
-              id="signup-password"
-              className="form-input"
-              type="password"
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              required
-              autoComplete="new-password"
-              minLength={6}
-            />
+            <div className="password-input-wrapper">
+              <input
+                id="signup-password"
+                className="form-input"
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                required
+                autoComplete="new-password"
+                minLength={6}
+              />
+              <button 
+                type="button" 
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? "👁️" : "👁️‍🗨️"}
+              </button>
+            </div>
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="signup-confirm">{t('auth_confirm')}</label>
-            <input
-              id="signup-confirm"
-              className="form-input"
-              type="password"
-              name="confirmPassword"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              placeholder="••••••••"
-              required
-              autoComplete="new-password"
-            />
+            <div className="password-input-wrapper">
+              <input
+                id="signup-confirm"
+                className="form-input"
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                placeholder="••••••••"
+                required
+                autoComplete="new-password"
+              />
+              <button 
+                type="button" 
+                className="password-toggle-btn"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                title={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+              </button>
+            </div>
           </div>
 
           <button 
