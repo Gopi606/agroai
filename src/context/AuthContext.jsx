@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../config/supabase';
 
 const AuthContext = createContext({});
 
@@ -11,84 +10,47 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setUserProfile(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    // Check local storage for persistent mock session instead of Supabase
+    const storedUser = localStorage.getItem('agroai_mock_user');
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      setUser(parsed);
+      setUserProfile({ name: parsed.name });
+    }
+    setLoading(false);
   }, []);
 
-  const fetchProfile = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (!error && data) {
-        setUserProfile(data);
-      }
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-    }
-  };
-
+  // Bypass sign-up validations
   const signUp = async (email, password, name) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name }
-      }
-    });
-
-    if (error) throw error;
-
-    // Create user profile
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert([{
-          id: data.user.id,
-          name,
-          email
-        }]);
-
-      if (profileError) console.error('Profile creation error:', profileError);
-    }
-
-    return data;
+    // Generate a mock user
+    const mockUser = { id: `mock-${Date.now()}`, email, name };
+    localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
+    
+    // Set state
+    setUser(mockUser);
+    setUserProfile({ name });
+    
+    return { data: { user: mockUser } };
   };
 
+  // Bypass sign-in validations (accepts any email/password)
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) throw error;
-    return data;
+    // Just extract login name from email for display
+    const name = email.split('@')[0];
+    const mockUser = { id: `mock-${Date.now()}`, email, name };
+    
+    localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
+    
+    // Set state
+    setUser(mockUser);
+    setUserProfile({ name });
+    
+    return { data: { user: mockUser } };
   };
 
+  // Sign out removes mock session
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    localStorage.removeItem('agroai_mock_user');
     setUser(null);
     setUserProfile(null);
   };
