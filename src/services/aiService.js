@@ -19,25 +19,25 @@ export async function analyzeImage(imageUrl, language = 'en', mode = 'plant') {
 
   const systemInstruction = `You are an expert agricultural AI assistant parsing crop and soil images. You must analyze the image and respond with valid JSON ONLY.
 Follow these steps carefully:
-2. VALIDATE: Check if the image clearly contains what is expected based on the mode.
+1. VALIDATE: Check if the image clearly contains what is expected based on the mode.
    Mode is: ${mode.toUpperCase()}
-   - If mode is PLANT: Image must contain a plant/leaf. If there is clearly no plant, return {"isValidCrop": false, "isSoil": false}.
-   - If mode is SOIL: Image must contain ANY form of soil, dirt, sand, or land (even if it is inside a bag, cup, hand, or container). If it is completely unrelated (e.g., a car, a face), return {"isValidCrop": false, "isSoil": false}.
-2. If mode is PLANT:
+   - If mode is PLANT: Image must contain a plant, leaf, or crop. If valid, set "isValidCrop": true, "isSoil": false. If there is clearly NO plant, return EXACTLY {"isValidCrop": false, "isSoil": false}.
+   - If mode is SOIL: Image must contain ANY form of soil, dirt, compost, sand, or land (even if it is inside a bag, cup, hand, or container). If valid, set "isValidCrop": true, "isSoil": true. If it is completely unrelated (e.g., a car, a face), return EXACTLY {"isValidCrop": false, "isSoil": false}.
+
+2. If mode is PLANT and valid:
    - Identify the specific crop disease. If healthy, set disease to "Healthy". Assess severity as "Low", "Medium", or "High".
-   - Set confidence score (0-100).
    - Provide detailed symptoms, remedy (organic AND chemical), and prevention tips.
-   - Set "isSoil": false.
-3. If mode is SOIL:
-   - Identify the primary visual characteristics of the soil (color tone, crusting, cracking, texture, organic matter presence).
-   - Compute estimated NPK (Nitrogen, Phosphorus, Potassium) availability and precise pH balance based on established scientific agricultural constants for [Insert Target Region, e.g., Indian Subcontinent/Tamil Nadu] focusing on [Insert Target Crop, e.g., Rice/Sugarcane/Cotton].
-   - CROSS-REFERENCE this estimate strictly against standard regional agronomic baselines. Do not guess blindly; use your trained knowledge of soil science regarding specific visual indicators (e.g., white crusts = high salinity, light color = low organic matter). 
-   - Classify soil type (Clay, Sandy, Loamy, or Silt) and document physical structure (water retention index, aeration).
-   - Suggest the most viable crops that thrive specifically within the predicted NPK ranges in this local region.
-   - Water requirement (Low / Medium / High).
-   - Prescribe specific NPK fertilizer adjustments (exact ratios, e.g., 20-20-20) and scientifically proven organic alternatives.
-   - Set "isSoil": true.
    - Set confidence score (0-100).
+
+3. If mode is SOIL and valid:
+   - Identify the primary visual characteristics of the soil (color tone, crusting, cracking, texture, organic matter presence).
+   - Classify soilType strictly as one of: "Clay", "Sandy", "Loamy", or "Silt".
+   - Based on visual indicators, estimate precise pH balance and NPK (Nitrogen, Phosphorus, Potassium) availability.
+   - Suggest the most viable crops that thrive specifically within these conditions.
+   - Prescribe specific NPK fertilizer adjustments and scientifically proven organic alternatives.
+   - Set waterRequirement to "Low", "Medium", or "High".
+   - Set confidence score (0-100).
+
 4. TRANSLATION: ALL text fields MUST be translated into ${targetLanguage}.
 
 Example JSON for PLANT:
@@ -82,7 +82,7 @@ Example JSON for SOIL:
         'Authorization': `Bearer ${AI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'llama-3.2-90b-vision-preview',
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
         messages: [
           {
             role: 'user',
@@ -95,6 +95,7 @@ Example JSON for SOIL:
             ]
           }
         ],
+        response_format: { type: "json_object" },
         max_tokens: 1024,
         temperature: 0.3
       })
