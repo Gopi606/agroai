@@ -8,6 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import MarketPrediction from '../components/MarketPrediction';
 import Camera from '../components/Camera';
 import { generateMockMarketData, getSmartRecommendation } from '../utils/marketData';
+import { processImage } from '../utils/imagePipeline';
 
 export default function Dashboard() {
   const { user, userProfile } = useAuth();
@@ -105,32 +106,16 @@ export default function Dashboard() {
     if (file) processFile(file);
   };
 
-  const processFile = (file) => {
-    // Validate file
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      setResultError('Please select a JPG, PNG, or WEBP image.');
-      return;
-    }
-
-    if (file.size === 0) {
-      setResultError('Invalid image');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setResultError('Image must be less than 10MB.');
-      return;
-    }
-
-    setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result);
+  const processFile = async (file) => {
+    try {
+      const dataUrl = await processImage(file);
+      setSelectedFile(file);
+      setPreviewUrl(dataUrl);
       setResult(null);
       setResultError('');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setResultError(err.message || 'Invalid image selected');
+    }
   };
 
   const handleDrop = (e) => {
@@ -380,10 +365,10 @@ export default function Dashboard() {
                     </button>
                   </div>
                   
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button className={`btn ${inputMode === 'upload' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('upload')}>📤 Upload Image</button>
-                    <button className={`btn ${inputMode === 'camera' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('camera')}>📸 Open Camera</button>
-                    <button className={`btn ${inputMode === 'live' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('live')}>🔴 Live Video</button>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button className={`btn ${inputMode === 'upload' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setInputMode('upload')}>📤 Upload Image</button>
+                    <button className={`btn ${inputMode === 'camera' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setInputMode('camera')}>📸 Open Camera</button>
+                    <button className={`btn ${inputMode === 'live' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setInputMode('live')}>🔴 Live Video</button>
                   </div>
                 </div>
 
@@ -422,17 +407,6 @@ export default function Dashboard() {
                         <span className="upload-icon">📸</span>
                         <h3>Upload Image</h3>
                         <p>{t('dash_upload_hint')}</p>
-                        <div 
-                          style={{ marginTop: 'var(--space-6)' }} 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setInputMode('camera');
-                          }}
-                        >
-                          <button className="btn btn-secondary" type="button">
-                            📸 Open Camera
-                          </button>
-                        </div>
                       </>
                     ) : (
                       <div className="upload-preview" onClick={e => e.stopPropagation()}>

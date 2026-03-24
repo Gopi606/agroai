@@ -1,10 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { processImage } from '../utils/imagePipeline';
 
 const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
-  const [facingMode, setFacingMode] = useState('environment'); // Default to back camera
   const [cameraActive, setCameraActive] = useState(false);
   const [error, setError] = useState('');
   const [isScanning, setIsScanning] = useState(true);
@@ -18,7 +17,7 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
 
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
+        video: { facingMode: "environment" },
         audio: false,
       });
       setStream(mediaStream);
@@ -30,11 +29,10 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       }
     } catch (err) {
       console.error('Error accessing camera:', err);
-      setError('Could not access the camera. Please allow permissions.');
+      setError('Permission denied');
       setCameraActive(false);
     }
-  }, [facingMode]);
-
+  }, []);
 
   useEffect(() => {
     startCamera();
@@ -45,6 +43,23 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       }
     };
   }, [startCamera]);
+
+  const captureFrameForLive = async () => {
+    if (videoRef.current && isLive) {
+      try {
+        const dataUrl = await processImage(videoRef.current);
+        if (dataUrl && onFrame) {
+          // fetch to convert to File
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], "live_frame.jpg", { type: "image/jpeg" });
+          onFrame(file);
+        }
+      } catch (err) {
+        console.warn('Live capture failed:', err.message);
+      }
+    }
+  };
 
   useEffect(() => {
     if (isLive && cameraActive && isScanning) {
@@ -59,89 +74,23 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
     };
   }, [isLive, cameraActive, isScanning]);
 
-  const toggleCamera = () => {
-    setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
-  };
-
-  const captureFrameForLive = () => {
-    if (videoRef.current && canvasRef.current && isLive) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      if (video.readyState !== 4 || video.videoWidth === 0) {
-        return;
-      }
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      let isBlack = true;
-      // sampling pixels for faster check
-      for (let i = 0; i < frameData.length; i += 40) {
-        if (frameData[i] > 10 || frameData[i+1] > 10 || frameData[i+2] > 10) {
-          isBlack = false;
-          break;
+  const captureImage = async () => {
+    if (videoRef.current) {
+      try {
+        const dataUrl = await processImage(videoRef.current);
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+        
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          setStream(null);
+          setCameraActive(false);
         }
+        if (onCapture) onCapture(file);
+      } catch (err) {
+        setError(err.message || 'Camera not ready or image too dark');
       }
-      if (isBlack) {
-        console.warn("Black frame detected, skipping live capture.");
-        return;
-      }
-
-      canvas.toBlob((blob) => {
-        if (blob && onFrame) {
-          const file = new File([blob], "live_frame.jpg", { type: "image/jpeg" });
-          onFrame(file);
-        }
-      }, 'image/jpeg', 0.6); // 60% quality for faster live processing
-    }
-  };
-
-  const captureImage = () => {
-    if (videoRef.current && canvasRef.current && !isLive) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      if (video.readyState !== 4 || video.videoWidth === 0) {
-        setError('Camera initializing... please wait');
-        return;
-      }
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      let isBlack = true;
-      for (let i = 0; i < frameData.length; i += 40) {
-        if (frameData[i] > 10 || frameData[i+1] > 10 || frameData[i+2] > 10) {
-          isBlack = false;
-          break;
-        }
-      }
-      if (isBlack) {
-        setError("Failed to capture image. Try again");
-        return;
-      }
-      
-      // Compress image
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
-          
-          // Stop camera stream after capture
-          if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            setStream(null);
-            setCameraActive(false);
-          }
-          if (onCapture) onCapture(file);
-        }
-      }, 'image/jpeg', 0.8); // 80% quality
     }
   };
 
@@ -174,7 +123,6 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
         </div>
       ) : (
         <>
-          {/* Overlay elements */}
           {cameraActive && (
             <div style={{
               position: 'absolute',
@@ -185,13 +133,11 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
               borderRadius: 'var(--radius-2xl)',
               boxShadow: 'inset 0 0 40px rgba(16, 185, 129, 0.2)'
             }}>
-              {/* Corner brackets for scanner effect */}
               <div style={{ position: 'absolute', top: 20, left: 20, width: 40, height: 40, borderTop: '4px solid var(--green-400)', borderLeft: '4px solid var(--green-400)' }}></div>
               <div style={{ position: 'absolute', top: 20, right: 20, width: 40, height: 40, borderTop: '4px solid var(--green-400)', borderRight: '4px solid var(--green-400)' }}></div>
               <div style={{ position: 'absolute', bottom: 20, left: 20, width: 40, height: 40, borderBottom: '4px solid var(--cyan-400)', borderLeft: '4px solid var(--cyan-400)' }}></div>
               <div style={{ position: 'absolute', bottom: 20, right: 20, width: 40, height: 40, borderBottom: '4px solid var(--cyan-400)', borderRight: '4px solid var(--cyan-400)' }}></div>
               
-              {/* Scanline animation */}
               <div style={{
                 position: 'absolute',
                 top: 0,
@@ -215,11 +161,9 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
               height: 'auto', 
               display: cameraActive ? 'block' : 'none',
               objectFit: 'cover',
-              aspectRatio: '4/3',
-              transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' 
+              aspectRatio: '4/3'
             }}
           />
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
           
           {cameraActive && (
             <div className="camera-controls" style={{
@@ -283,19 +227,7 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
                 </button>
               )}
 
-              <button className="btn-secondary" onClick={toggleCamera} style={{
-                borderRadius: 'var(--radius-full)',
-                width: '50px',
-                height: '50px',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backdropFilter: 'blur(10px)',
-                background: 'rgba(0,0,0,0.5)'
-              }}>
-                🔄
-              </button>
+              <div style={{ width: '50px', height: '50px' }}></div>
             </div>
           )}
         </>

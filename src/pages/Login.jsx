@@ -26,7 +26,7 @@ export default function Login() {
       await signIn(form.email, form.password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message || 'Failed to sign in. Please check your credentials.');
+      setError('Login failed');
     } finally {
       setLoading(false);
     }
@@ -121,7 +121,7 @@ export default function Login() {
                 await signInWithGoogle();
                 navigate('/dashboard');
               } catch (err) {
-                setError('Failed to sign in with Google');
+                setError('Login failed');
               } finally {
                 setLoading(false);
               }
