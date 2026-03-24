@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
+import { generateMockMarketData } from '../utils/marketData';
 
-export default function MarketPrediction() {
+export default function MarketPrediction({ resultType, soilType }) {
   const [marketData, setMarketData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,79 +27,10 @@ export default function MarketPrediction() {
     };
   }, []);
 
-  const generateMockMarketData = () => {
-    const basePrices = {
-      'Wheat': 2500,
-      'Rice': 3200,
-      'Cotton': 5500,
-      'Sugarcane': 350
-    };
-
-    const predictNextDays = (pricesList, numDays) => {
-      const n = pricesList.length;
-      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-      
-      for (let i = 0; i < n; i++) {
-        sumX += i;
-        sumY += pricesList[i];
-        sumXY += i * pricesList[i];
-        sumXX += i * i;
-      }
-      
-      const denominator = (n * sumXX - sumX * sumX);
-      if (denominator === 0) return Array(numDays).fill(pricesList[n-1]);
-      
-      const m = (n * sumXY - sumX * sumY) / denominator;
-      const b = (sumY - m * sumX) / n;
-      
-      const predictions = [];
-      for (let j = 0; j < numDays; j++) {
-        const volatility = (Math.random() - 0.5) * (pricesList[n-1] * 0.05);
-        predictions.push(Math.round(m * (n + j) + b + volatility));
-      }
-      return predictions;
-    };
-
-    return Object.keys(basePrices).map(crop => {
-      const pastData = [];
-      let currentPrice = basePrices[crop] + (Math.random() - 0.5) * 500;
-      
-      for (let i = 0; i < 30; i++) {
-        currentPrice += (Math.random() - 0.4) * 50;
-        pastData.push(Math.round(currentPrice));
-      }
-      
-      const next7Days = predictNextDays(pastData.slice(-15), 7);
-      
-      const current = pastData[29];
-      const predictedAvg = next7Days.reduce((a,b)=>a+b,0) / 7;
-      let recommendation = 'Hold';
-      let insight = `Prices are stable. Wait for a better opportunity.`;
-      
-      if (predictedAvg > current * 1.05) {
-        recommendation = 'Hold & Wait';
-        insight = `Price expected to rise significantly (${Math.round((predictedAvg-current)/current * 100)}%). Hold for now.`;
-      } else if (predictedAvg < current * 0.95) {
-        recommendation = 'Sell Now';
-        insight = `Price expected to drop due to market patterns. Best time to sell.`;
-      }
-
-      return {
-        crop,
-        currentPrice: current,
-        pastData,
-        predictions: next7Days,
-        recommendation,
-        insight,
-        trend: predictedAvg > current ? 'up' : 'down'
-      };
-    });
-  };
 
   const fetchMarketData = async () => {
     setLoading(true);
     try {
-      // Use built-in mock generator for serverless compatibility
       const data = generateMockMarketData();
       setMarketData(data);
       localStorage.setItem('agroai_market_data', JSON.stringify(data));
@@ -122,7 +53,6 @@ export default function MarketPrediction() {
     const data = [];
     const today = new Date();
     
-    // Last 7 days of past data
     const recentPast = past.slice(-7);
     recentPast.forEach((price, i) => {
       const d = new Date(today);
@@ -134,14 +64,12 @@ export default function MarketPrediction() {
       });
     });
 
-    // The current day ties both lines
     data.push({
       date: 'Today',
       Actual: past[past.length - 1],
       Predicted: past[past.length - 1]
     });
 
-    // Next 7 days predicted
     predicted.forEach((price, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() + i + 1);
@@ -157,6 +85,23 @@ export default function MarketPrediction() {
 
   if (loading) return <LoadingSpinner text="Analyzing market trends..." />;
 
+  // Optionally filter based on resultType (e.g. disease) or soilType if intelligent recommendation is desired.
+  // We'll show top crops and a special recommendation message at the top if soilType is present.
+
+  let topCropsToDisplay = marketData;
+  let customRecommendation = null;
+
+  if (soilType) {
+    customRecommendation = `Based on your ${soilType} soil and current market trends, consider growing Maize or Cotton for better profit margins.`;
+    // We could prioritize Maize/Cotton
+    topCropsToDisplay = marketData.sort((a,b) => {
+      if (a.crop === 'Maize' || a.crop === 'Cotton') return -1;
+      return 0;
+    });
+  } else if (resultType && resultType !== 'Healthy') {
+    customRecommendation = `Since your crop has ${resultType}, you might face lower yields. Consider holding existing harvested stock to sell when prices rise, as market trends show fluctuations.`;
+  }
+
   return (
     <div className="market-prediction">
       {isOffline && (
@@ -169,11 +114,21 @@ export default function MarketPrediction() {
         </div>
       )}
 
+      {customRecommendation && (
+        <div style={{
+          background: 'var(--bg-secondary)', padding: '20px', borderRadius: '12px', 
+          marginBottom: '20px', borderLeft: '4px solid var(--green-500)', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'
+        }}>
+          <h3 style={{ margin: '0 0 10px 0', color: 'var(--green-600)' }}>🤖 Intelligent Recommendation</h3>
+          <p style={{ margin: 0, fontSize: '1.1rem' }}>{customRecommendation}</p>
+        </div>
+      )}
+
       {error ? (
         <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-          {marketData.map((crop, idx) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+          {topCropsToDisplay.slice(0, 12).map((crop, idx) => (
             <div key={idx} style={{
               background: 'white', borderRadius: '12px', padding: '20px', 
               boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #eee'
@@ -189,19 +144,29 @@ export default function MarketPrediction() {
                   ₹{crop.currentPrice} / qtl
                 </span>
               </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '0.9rem', color: '#4b5563' }}>
+                <div style={{textAlign: 'center'}}>
+                  <span style={{display: 'block', fontWeight: 'bold'}}>3-Day Est</span>
+                  <span>₹{crop.day3Price}</span>
+                </div>
+                <div style={{textAlign: 'center'}}>
+                  <span style={{display: 'block', fontWeight: 'bold'}}>7-Day Est</span>
+                  <span>₹{crop.day7Price}</span>
+                </div>
+              </div>
               
-              <div style={{ height: '200px', width: '100%', marginBottom: '16px' }}>
+              <div style={{ height: '180px', width: '100%', marginBottom: '16px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={prepareChartData(crop.pastData, crop.predictions)}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis dataKey="date" tick={{fontSize: 10, fill: '#6b7280'}} tickMargin={10} />
-                    <YAxis domain={['auto', 'auto']} tick={{fontSize: 10, fill: '#6b7280'}} tickMargin={10} />
+                    <YAxis domain={['auto', 'auto']} tick={{fontSize: 10, fill: '#6b7280'}} tickMargin={10} width={40} />
                     <Tooltip 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
                     />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                    <Line type="monotone" dataKey="Actual" stroke="#3b82f6" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
-                    <Line type="monotone" dataKey="Predicted" stroke="#10b981" strokeWidth={3} strokeDasharray="5 5" dot={{r: 4}} activeDot={{r: 6}} />
+                    <Line type="monotone" dataKey="Actual" stroke="#3b82f6" strokeWidth={3} dot={{r: 2}} activeDot={{r: 4}} />
+                    <Line type="monotone" dataKey="Predicted" stroke="#10b981" strokeWidth={3} strokeDasharray="5 5" dot={{r: 2}} activeDot={{r: 4}} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

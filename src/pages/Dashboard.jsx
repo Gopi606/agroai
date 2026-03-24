@@ -7,6 +7,7 @@ import { getNotifications, getDefaultNotifications, getSeasonalAdvice } from '..
 import LoadingSpinner from '../components/LoadingSpinner';
 import MarketPrediction from '../components/MarketPrediction';
 import Camera from '../components/Camera';
+import { generateMockMarketData, getSmartRecommendation } from '../utils/marketData';
 
 export default function Dashboard() {
   const { user, userProfile } = useAuth();
@@ -21,13 +22,17 @@ export default function Dashboard() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [dragover, setDragover] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
+  // Input modes
+  const [scanMode, setScanMode] = useState('plant'); // 'plant' or 'soil'
+  const [inputMode, setInputMode] = useState('upload'); // 'upload', 'camera', 'live'
+  
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const voiceSynthesis = window.speechSynthesis;
 
   // Result state
   const [result, setResult] = useState(null);
   const [resultError, setResultError] = useState('');
+  const processingLiveRef = useRef(false);
 
   // History state
   const [history, setHistory] = useState([]);
@@ -38,6 +43,25 @@ export default function Dashboard() {
 
   // Advice
   const advice = getSeasonalAdvice(language);
+
+  const [marketData, setMarketData] = useState([]);
+  
+  useEffect(() => {
+    try {
+      let data = localStorage.getItem('agroai_market_data');
+      if (!data) {
+        data = generateMockMarketData();
+        localStorage.setItem('agroai_market_data', JSON.stringify(data));
+        setMarketData(data);
+      } else {
+        setMarketData(JSON.parse(data));
+      }
+    } catch (e) {
+      setMarketData(generateMockMarketData());
+    }
+  }, []);
+
+  const smartRec = getSmartRecommendation(marketData, scanMode, result);
 
   // Load history
   const loadHistory = useCallback(async () => {
@@ -144,7 +168,7 @@ export default function Dashboard() {
           const upload = await saveUploadRecord(user.id, imageUrl);
 
           // Analyze with AI
-          const aiResult = await analyzeImage(imageUrl, language);
+          const aiResult = await analyzeImage(imageUrl, language, scanMode);
           
           // Save result to DB
           await saveResult(upload.id, aiResult);
@@ -158,13 +182,28 @@ export default function Dashboard() {
       }
 
       // Fallback: analyze without Supabase (demo mode)
-      const aiResult = await analyzeImage(imageUrl, language);
+      const aiResult = await analyzeImage(imageUrl, language, scanMode);
       setResult(aiResult);
 
     } catch (err) {
       setResultError(err.message || 'Analysis failed. Please try again.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleAnalyzeLive = async (file) => {
+    if (processingLiveRef.current) return;
+    processingLiveRef.current = true;
+    try {
+      const imageUrl = getLocalImageUrl(file);
+      const aiResult = await analyzeImage(imageUrl, language, scanMode);
+      setResult(aiResult);
+      setResultError('');
+    } catch (err) {
+      console.error('Live analysis error', err);
+    } finally {
+      processingLiveRef.current = false;
     }
   };
 
@@ -210,7 +249,16 @@ export default function Dashboard() {
       : `${result.disease}. ${t('result_symptoms')}: ${result.symptoms}. ${t('result_remedy')}: ${result.remedy}`;
 
     const utterance = new SpeechSynthesisUtterance(textToRead);
-    utterance.lang = langMap[language] || 'en-US';
+    const targetLang = langMap[language] || 'en-US';
+    utterance.lang = targetLang;
+    
+    // Select the best voice for the language
+    const voices = voiceSynthesis.getVoices();
+    const voice = voices.find(v => v.lang === targetLang) || 
+                  voices.find(v => v.lang.startsWith(targetLang.split('-')[0]));
+    if (voice) {
+      utterance.voice = voice;
+    }
     
     utterance.onend = () => setIsPlayingVoice(false);
     utterance.onerror = () => setIsPlayingVoice(false);
@@ -300,16 +348,44 @@ export default function Dashboard() {
                   <h2>📤 {t('dash_upload_title')}</h2>
                   <p>{t('dash_upload_desc')}</p>
                 </div>
+                
+                {/* Input Modes Selection */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.25rem', borderRadius: 'var(--radius-full)' }}>
+                    <button 
+                      className={`btn ${scanMode === 'plant' ? 'btn-primary' : ''}`} 
+                      style={{ borderRadius: 'var(--radius-full)', padding: '0.5rem 1.5rem', background: scanMode !== 'plant' ? 'transparent' : '', color: scanMode !== 'plant' ? 'var(--text-color)' : '' }}
+                      onClick={() => setScanMode('plant')}
+                    >
+                      🍃 Plant Mode
+                    </button>
+                    <button 
+                      className={`btn ${scanMode === 'soil' ? 'btn-primary' : ''}`} 
+                      style={{ borderRadius: 'var(--radius-full)', padding: '0.5rem 1.5rem', background: scanMode !== 'soil' ? 'transparent' : '', color: scanMode !== 'soil' ? 'var(--text-color)' : '' }}
+                      onClick={() => setScanMode('soil')}
+                    >
+                      🌍 Soil Mode
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button className={`btn ${inputMode === 'upload' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('upload')}>📤 Upload</button>
+                    <button className={`btn ${inputMode === 'camera' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('camera')}>📸 Camera</button>
+                    <button className={`btn ${inputMode === 'live' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('live')}>🔴 Live Video</button>
+                  </div>
+                </div>
 
-                {/* Upload Zone */}
-                {showCamera ? (
+                {/* Upload / Camera / Live Zone */}
+                {inputMode === 'camera' || inputMode === 'live' ? (
                   <div style={{ marginBottom: 'var(--space-6)' }}>
                     <Camera 
+                      isLive={inputMode === 'live'}
                       onCapture={(file) => {
                         processFile(file);
-                        setShowCamera(false);
+                        setInputMode('upload');
                       }}
-                      onCancel={() => setShowCamera(false)}
+                      onFrame={handleAnalyzeLive}
+                      onCancel={() => setInputMode('upload')}
                     />
                   </div>
                 ) : (
@@ -338,7 +414,7 @@ export default function Dashboard() {
                           style={{ marginTop: 'var(--space-6)' }} 
                           onClick={(e) => {
                             e.stopPropagation();
-                            setShowCamera(true);
+                            setInputMode('camera');
                           }}
                         >
                           <button className="btn btn-secondary" type="button">
@@ -395,8 +471,10 @@ export default function Dashboard() {
                       <div className="result-card" style={{ borderLeft: '4px solid var(--red-500)' }}>
                         <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
                           <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>❓</div>
-                          <h3 style={{ color: 'var(--red-400)', marginBottom: 'var(--space-2)' }}>{t('result_not_crop')}</h3>
-                          <p>{t('result_not_crop_msg')}</p>
+                          <h3 style={{ color: 'var(--red-400)', marginBottom: 'var(--space-2)' }}>
+                            {scanMode === 'soil' ? 'Soil not detected' : t('result_not_crop')}
+                          </h3>
+                          <p>{scanMode === 'soil' ? 'Please ensure the image contains clear soil.' : t('result_not_crop_msg')}</p>
                         </div>
                       </div>
                     ) : result.confidence < 60 ? (
@@ -409,7 +487,7 @@ export default function Dashboard() {
                       </div>
                     ) : (
                       <>
-                        {result.multiLeaf && (
+                        {result.multiLeaf && scanMode === 'plant' && (
                           <div style={{ 
                             marginBottom: 'var(--space-4)', 
                             padding: 'var(--space-3)', 
@@ -417,97 +495,201 @@ export default function Dashboard() {
                             borderLeft: '4px solid var(--blue-500)',
                             borderRadius: 'var(--radius-md)'
                           }}>
-                            ℹ️ {t('result_multi_leaf')}
+                            ℹ️ Analyzing main leaf. {t('result_multi_leaf')}
                           </div>
                         )}
-                        <div className="result-card">
-                          <div className="result-header">
-                            <div>
-                              <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-                                {t('result_disease')}
-                              </p>
-                              <h3 className="result-disease" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                {result.disease === 'Healthy' ? `✅ ${t('result_healthy')}` : `🔍 ${result.disease}`}
-                                <button 
-                                  onClick={playVoice}
-                                  className="btn-secondary"
-                                  style={{
-                                    padding: '4px 8px',
-                                    borderRadius: '50%',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '1rem',
-                                    border: '1px solid var(--border-color)',
-                                    background: isPlayingVoice ? 'var(--green-500)' : 'transparent',
-                                  }}
-                                  title={isPlayingVoice ? "Stop Voice" : "Read Aloud"}
-                                >
-                                  {isPlayingVoice ? '⏸️' : '🔊'}
-                                </button>
-                              </h3>
+                        
+                        {(scanMode === 'soil' || result.isSoil) ? (
+                          <div className="result-card">
+                            <div className="result-header">
+                              <div>
+                                <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                                  Soil Classification
+                                </p>
+                                <h3 className="result-disease" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                  🌍 {result.soilType || 'Soil'}
+                                  <button 
+                                    onClick={playVoice}
+                                    className="btn-secondary"
+                                    style={{
+                                      padding: '4px 8px',
+                                      borderRadius: '50%',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '1rem',
+                                      border: '1px solid var(--border-color)',
+                                      background: isPlayingVoice ? 'var(--green-500)' : 'transparent',
+                                    }}
+                                    title={isPlayingVoice ? "Stop Voice" : "Read Aloud"}
+                                  >
+                                    {isPlayingVoice ? '⏸️' : '🔊'}
+                                  </button>
+                                </h3>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                {result.confidence && (
+                                  <span className="result-confidence">
+                                    📊 {result.confidence}%
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                              {result.confidence && (
-                                <span className="result-confidence">
-                                  📊 {result.confidence}%
-                                </span>
-                              )}
-                              {result.severity && result.disease !== 'Healthy' && (
-                                <div style={{ 
-                                  marginTop: '0.5rem', 
-                                  fontSize: 'var(--fs-xs)',
-                                  padding: '0.2rem 0.6rem',
-                                  borderRadius: 'var(--radius-full)',
-                                  display: 'inline-block',
-                                  background: String(result.severity).toLowerCase().includes('high') ? 'rgba(239, 68, 68, 0.2)' : 
-                                              String(result.severity).toLowerCase().includes('med') ? 'rgba(245, 158, 11, 0.2)' : 
-                                              'rgba(16, 185, 129, 0.2)',
-                                  color: String(result.severity).toLowerCase().includes('high') ? 'var(--red-400)' : 
-                                         String(result.severity).toLowerCase().includes('med') ? 'var(--yellow-400)' : 
-                                         'var(--green-400)'
-                                }}>
-                                  Severity: {result.severity}
-                                </div>
-                              )}
-                            </div>
-                          </div>
 
-                          {result.disease === 'Healthy' ? (
-                            <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-                              <div style={{ fontSize: '4rem', marginBottom: 'var(--space-4)' }}>🎉</div>
-                              <p style={{ color: 'var(--green-400)', fontSize: 'var(--fs-lg)' }}>
-                                {t('result_healthy_msg')}
-                              </p>
-                            </div>
-                          ) : (
                             <div className="result-sections">
                               <div className="result-section">
-                                <div className="result-section-icon symptoms">⚠️</div>
+                                <div className="result-section-icon symptoms">💧</div>
                                 <div className="result-section-content">
-                                  <h4>{t('result_symptoms')}</h4>
-                                  <p>{result.symptoms}</p>
+                                  <h4>Characteristics & Water</h4>
+                                  <p>{result.characteristics} • <strong>Water Requirement:</strong> {result.waterRequirement}</p>
                                 </div>
                               </div>
 
                               <div className="result-section">
-                                <div className="result-section-icon remedy">💊</div>
+                                <div className="result-section-icon remedy">🌾</div>
                                 <div className="result-section-content">
-                                  <h4>{t('result_remedy')}</h4>
-                                  <p>{result.remedy}</p>
+                                  <h4>Suitable Crops</h4>
+                                  <p>{result.suitableCrops}</p>
                                 </div>
                               </div>
 
                               <div className="result-section">
-                                <div className="result-section-icon prevention">🛡️</div>
+                                <div className="result-section-icon prevention">📦</div>
                                 <div className="result-section-content">
-                                  <h4>{t('result_prevention')}</h4>
-                                  <p>{result.prevention}</p>
+                                  <h4>Fertilizer Suggestions</h4>
+                                  <p>{result.fertilizerSuggestions}</p>
                                 </div>
                               </div>
                             </div>
-                          )}
-                        </div>
+                            
+                            {smartRec && (
+                              <div style={{ 
+                                marginTop: 'var(--space-6)', 
+                                padding: 'var(--space-4)', 
+                                background: 'rgba(16, 185, 129, 0.1)', 
+                                border: '1px solid var(--green-400)',
+                                borderRadius: 'var(--radius-lg)',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 'var(--space-4)'
+                              }}>
+                                <div style={{ fontSize: '2rem' }}>{smartRec.icon}</div>
+                                <div>
+                                  <h4 style={{ color: 'var(--green-600)', margin: '0 0 var(--space-2) 0' }}>{smartRec.title}</h4>
+                                  <p style={{ margin: 0 }}>{smartRec.text}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="result-card">
+                            <div className="result-header">
+                              <div>
+                                <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                                  {t('result_disease')}
+                                </p>
+                                <h3 className="result-disease" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                  {result.disease === 'Healthy' ? `✅ ${t('result_healthy')}` : `🔍 ${result.disease}`}
+                                  <button 
+                                    onClick={playVoice}
+                                    className="btn-secondary"
+                                    style={{
+                                      padding: '4px 8px',
+                                      borderRadius: '50%',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '1rem',
+                                      border: '1px solid var(--border-color)',
+                                      background: isPlayingVoice ? 'var(--green-500)' : 'transparent',
+                                    }}
+                                    title={isPlayingVoice ? "Stop Voice" : "Read Aloud"}
+                                  >
+                                    {isPlayingVoice ? '⏸️' : '🔊'}
+                                  </button>
+                                </h3>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                {result.confidence && (
+                                  <span className="result-confidence">
+                                    📊 {result.confidence}%
+                                  </span>
+                                )}
+                                {result.severity && result.disease !== 'Healthy' && (
+                                  <div style={{ 
+                                    marginTop: '0.5rem', 
+                                    fontSize: 'var(--fs-xs)',
+                                    padding: '0.2rem 0.6rem',
+                                    borderRadius: 'var(--radius-full)',
+                                    display: 'inline-block',
+                                    background: String(result.severity).toLowerCase().includes('high') ? 'rgba(239, 68, 68, 0.2)' : 
+                                                String(result.severity).toLowerCase().includes('med') ? 'rgba(245, 158, 11, 0.2)' : 
+                                                'rgba(16, 185, 129, 0.2)',
+                                    color: String(result.severity).toLowerCase().includes('high') ? 'var(--red-400)' : 
+                                           String(result.severity).toLowerCase().includes('med') ? 'var(--yellow-400)' : 
+                                           'var(--green-400)'
+                                  }}>
+                                    Severity: {result.severity}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {result.disease === 'Healthy' ? (
+                              <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
+                                <div style={{ fontSize: '4rem', marginBottom: 'var(--space-4)' }}>🎉</div>
+                                <p style={{ color: 'var(--green-400)', fontSize: 'var(--fs-lg)' }}>
+                                  {t('result_healthy_msg')}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="result-sections">
+                                <div className="result-section">
+                                  <div className="result-section-icon symptoms">⚠️</div>
+                                  <div className="result-section-content">
+                                    <h4>{t('result_symptoms')}</h4>
+                                    <p>{result.symptoms}</p>
+                                  </div>
+                                </div>
+
+                                <div className="result-section">
+                                  <div className="result-section-icon remedy">💊</div>
+                                  <div className="result-section-content">
+                                    <h4>{t('result_remedy')}</h4>
+                                    <p>{result.remedy}</p>
+                                  </div>
+                                </div>
+
+                                <div className="result-section">
+                                  <div className="result-section-icon prevention">🛡️</div>
+                                  <div className="result-section-content">
+                                    <h4>{t('result_prevention')}</h4>
+                                    <p>{result.prevention}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {smartRec && (
+                              <div style={{ 
+                                marginTop: 'var(--space-6)', 
+                                padding: 'var(--space-4)', 
+                                background: 'rgba(16, 185, 129, 0.1)', 
+                                border: '1px solid var(--green-400)',
+                                borderRadius: 'var(--radius-lg)',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 'var(--space-4)'
+                              }}>
+                                <div style={{ fontSize: '2rem' }}>{smartRec.icon}</div>
+                                <div>
+                                  <h4 style={{ color: 'var(--green-600)', margin: '0 0 var(--space-2) 0' }}>{smartRec.title}</h4>
+                                  <p style={{ margin: 0 }}>{smartRec.text}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>

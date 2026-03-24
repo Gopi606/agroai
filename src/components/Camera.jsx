@@ -1,12 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 
-const Camera = ({ onCapture, onCancel }) => {
+const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
   const [facingMode, setFacingMode] = useState('environment'); // Default to back camera
   const [cameraActive, setCameraActive] = useState(false);
   const [error, setError] = useState('');
+  const [isScanning, setIsScanning] = useState(true);
+  const liveIntervalRef = useRef(null);
 
   const startCamera = useCallback(async () => {
     setError('');
@@ -34,18 +36,50 @@ const Camera = ({ onCapture, onCancel }) => {
   useEffect(() => {
     startCamera();
     return () => {
+      if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
   }, [startCamera]);
 
+  useEffect(() => {
+    if (isLive && cameraActive && isScanning) {
+      liveIntervalRef.current = setInterval(() => {
+        captureFrameForLive();
+      }, 2000);
+    } else {
+      if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
+    }
+    return () => {
+      if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
+    };
+  }, [isLive, cameraActive, isScanning]);
+
   const toggleCamera = () => {
     setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
   };
 
+  const captureFrameForLive = () => {
+    if (videoRef.current && canvasRef.current && isLive) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        if (blob && onFrame) {
+          const file = new File([blob], "live_frame.jpg", { type: "image/jpeg" });
+          onFrame(file);
+        }
+      }, 'image/jpeg', 0.6); // 60% quality for faster live processing
+    }
+  };
+
   const captureImage = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current && !isLive) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
@@ -65,13 +99,14 @@ const Camera = ({ onCapture, onCancel }) => {
             setStream(null);
             setCameraActive(false);
           }
-          onCapture(file);
+          if (onCapture) onCapture(file);
         }
       }, 'image/jpeg', 0.8); // 80% quality
     }
   };
 
   const handleCancel = () => {
+    if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
@@ -116,17 +151,17 @@ const Camera = ({ onCapture, onCancel }) => {
               <div style={{ position: 'absolute', bottom: 20, left: 20, width: 40, height: 40, borderBottom: '4px solid var(--cyan-400)', borderLeft: '4px solid var(--cyan-400)' }}></div>
               <div style={{ position: 'absolute', bottom: 20, right: 20, width: 40, height: 40, borderBottom: '4px solid var(--cyan-400)', borderRight: '4px solid var(--cyan-400)' }}></div>
               
-              {/* Scanline animation placeholder */}
+              {/* Scanline animation */}
               <div style={{
                 position: 'absolute',
-                top: '50%',
+                top: 0,
                 left: 0,
                 right: 0,
-                height: '2px',
+                height: '4px',
                 background: 'linear-gradient(90deg, transparent, var(--green-400), transparent)',
                 boxShadow: '0 0 10px var(--green-400)',
-                opacity: 0.6,
-                transform: 'translateY(-50%)' // would normally animate up and down
+                opacity: 0.8,
+                animation: isLive ? 'scanline 2s linear infinite' : 'none'
               }}></div>
             </div>
           )}
@@ -173,20 +208,40 @@ const Camera = ({ onCapture, onCancel }) => {
                 ✕
               </button>
               
-              <button onClick={captureImage} style={{
-                background: 'var(--green-500)',
-                border: '4px solid rgba(255,255,255,0.8)',
-                backgroundClip: 'padding-box',
-                borderRadius: '50%',
-                width: '72px',
-                height: '72px',
-                cursor: 'pointer',
-                boxShadow: 'var(--glow-green-intense)',
-                transition: 'transform var(--transition-fast)'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-              ></button>
+              {!isLive && (
+                <button onClick={captureImage} style={{
+                  background: 'var(--green-500)',
+                  border: '4px solid rgba(255,255,255,0.8)',
+                  backgroundClip: 'padding-box',
+                  borderRadius: '50%',
+                  width: '72px',
+                  height: '72px',
+                  cursor: 'pointer',
+                  boxShadow: 'var(--glow-green-intense)',
+                  transition: 'transform var(--transition-fast)'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                ></button>
+              )}
+
+              {isLive && (
+                <button 
+                  onClick={() => setIsScanning(!isScanning)}
+                  style={{ 
+                    color: 'white', 
+                    fontSize: '1.2rem', 
+                    fontWeight: 'bold', 
+                    textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+                    background: isScanning ? 'var(--red-500)' : 'var(--green-500)',
+                    padding: '8px 16px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '2px solid rgba(255,255,255,0.8)',
+                    cursor: 'pointer'
+                  }}>
+                  {isScanning ? '🛑 Stop Scan' : '▶️ Start Scan'}
+                </button>
+              )}
 
               <button className="btn-secondary" onClick={toggleCamera} style={{
                 borderRadius: 'var(--radius-full)',

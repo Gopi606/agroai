@@ -1,10 +1,10 @@
 const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
 const AI_API_KEY = import.meta.env.VITE_AI_API_KEY;
 
-export async function analyzeImage(imageUrl, language = 'en') {
+export async function analyzeImage(imageUrl, language = 'en', mode = 'plant') {
   if (!AI_API_KEY || AI_API_KEY === 'your_grok_api_key_here' || AI_API_KEY === 'your_groq_api_key_here') {
     // Return demo data when API key not configured
-    return getDemoResult(language);
+    return getDemoResult(language, mode);
   }
 
   const languageNames = {
@@ -19,23 +19,47 @@ export async function analyzeImage(imageUrl, language = 'en') {
 
   const systemInstruction = `You are an expert agricultural AI assistant. You must analyze the image and respond with valid JSON ONLY.
 Follow these steps carefully:
-1. VALIDATE: Check if the image clearly contains a plant or crop leaf. If it is a human, animal, object, or random photo, you MUST return exactly: {"isValidCrop": false}.
-2. LEAF COUNT: Look at the number of leaves. If there are multiple distinct leaves or a whole plant, set "multiLeaf": true, and analyze only the most prominent leaf. Otherwise set "multiLeaf": false.
-3. ANALYSIS: Identify the specific crop disease. If healthy, set disease to "Healthy". Assess the severity as "Low", "Medium", or "High".
-4. CONFIDENCE: Give a confidence score (0-100).
-5. TREATMENT: Provide detailed symptoms. For remedy, provide a detailed paragraph including both organic AND chemical treatments. Provide detailed prevention tips.
-6. TRANSLATION: ALL text fields (disease, symptoms, remedy, prevention, severity) MUST be completely translated into ${targetLanguage}. Do not use English unless the target is English.
+1. VALIDATE: Check if the image clearly contains what is expected based on the mode.
+   Mode is: ${mode.toUpperCase()}
+   - If mode is PLANT: Image must contain a plant/leaf. If not, return {"isValidCrop": false, "isSoil": false}.
+   - If mode is SOIL: Image must contain soil. If not, return {"isValidCrop": false, "isSoil": false}.
+2. If mode is PLANT:
+   - Identify the specific crop disease. If healthy, set disease to "Healthy". Assess severity as "Low", "Medium", or "High".
+   - Set confidence score (0-100).
+   - Provide detailed symptoms, remedy (organic AND chemical), and prevention tips.
+   - Set "isSoil": false.
+3. If mode is SOIL:
+   - Classify soil type: Clay, Sandy, Loamy, or Silt.
+   - Identify characteristics (water retention, fertility).
+   - Suggest suitable crops.
+   - Water requirement (Low / Medium / High).
+   - Fertilizer suggestions.
+   - Set "isSoil": true.
+   - Set confidence score (0-100).
+4. TRANSLATION: ALL text fields MUST be translated into ${targetLanguage}.
 
-Example JSON output format for a valid crop:
+Example JSON for PLANT:
 {
   "isValidCrop": true,
-  "multiLeaf": true,
+  "isSoil": false,
   "disease": "[Disease Name in ${targetLanguage}]",
   "confidence": 85,
   "severity": "[Low/Medium/High in ${targetLanguage}]",
   "symptoms": "[Detailed symptoms in ${targetLanguage}]",
   "remedy": "[Detailed organic and chemical remedy in ${targetLanguage}]",
   "prevention": "[Detailed prevention tips in ${targetLanguage}]"
+}
+
+Example JSON for SOIL:
+{
+  "isValidCrop": true,
+  "isSoil": true,
+  "soilType": "[Clay/Sandy/Loamy/Silt in ${targetLanguage}]",
+  "characteristics": "[Water retention, fertility in ${targetLanguage}]",
+  "suitableCrops": "[Crops in ${targetLanguage}]",
+  "waterRequirement": "[Low/Medium/High in ${targetLanguage}]",
+  "fertilizerSuggestions": "[Suggestions in ${targetLanguage}]",
+  "confidence": 90
 }`;
 
   try {
@@ -95,24 +119,37 @@ Example JSON output format for a valid crop:
 
       return {
         isValidCrop: result.isValidCrop !== false,
+        isSoil: !!result.isSoil,
         multiLeaf: !!result.multiLeaf,
         severity: result.severity || 'Unknown',
         disease: result.disease || 'Unknown',
         symptoms: result.symptoms || 'Unable to determine symptoms',
         remedy: result.remedy || 'Consult a local agricultural expert',
         prevention: result.prevention || 'Practice good crop management',
+        soilType: result.soilType || '',
+        characteristics: result.characteristics || '',
+        suitableCrops: result.suitableCrops || '',
+        waterRequirement: result.waterRequirement || '',
+        fertilizerSuggestions: result.fertilizerSuggestions || '',
         confidence: result.confidence || 75
       };
     } catch (parseError) {
       // If JSON parsing fails, try to extract info from plain text
+      const isSoil = content.includes('"isSoil": true') || content.toLowerCase().includes('soil type');
       return {
-        isValidCrop: !content.includes('"isValidCrop": false') && !content.toLowerCase().includes('not a crop'),
+        isValidCrop: !content.includes('"isValidCrop": false') && !content.toLowerCase().includes('not a crop') && !content.toLowerCase().includes('not soil'),
+        isSoil: isSoil,
         multiLeaf: content.includes('"multiLeaf": true') || content.toLowerCase().includes('multiple leaves'),
         severity: extractField(content, 'severity') || 'Unknown',
         disease: extractField(content, 'disease') || 'Analysis Complete',
         symptoms: extractField(content, 'symptoms') || content.substring(0, 200),
         remedy: extractField(content, 'remedy') || 'Consult a local agricultural expert',
         prevention: extractField(content, 'prevention') || 'Practice good crop management',
+        soilType: extractField(content, 'soilType') || '',
+        characteristics: extractField(content, 'characteristics') || '',
+        suitableCrops: extractField(content, 'suitableCrops') || '',
+        waterRequirement: extractField(content, 'waterRequirement') || '',
+        fertilizerSuggestions: extractField(content, 'fertilizerSuggestions') || '',
         confidence: parseInt(extractField(content, 'confidence')) || 70
       };
     }
@@ -146,22 +183,34 @@ async function blobUrlToBase64(blobUrl) {
   });
 }
 
-function getDemoResult(language) {
+function getDemoResult(language, mode) {
   // Simulate API delay
   return new Promise((resolve) => {
     setTimeout(() => {
-      if (!languageNames[language]) language = 'en';
-      
-      resolve({
-        isValidCrop: true,
-        multiLeaf: false,
-        severity: 'High',
-        disease: language === 'en' ? 'Late Blight' : 'தாமதமான கருகல் (Late Blight)',
-        symptoms: language === 'en' ? 'Dark brown spots on leaves, white mold on undersides.' : 'இலைகளில் அடர் பழுப்பு புள்ளிகள்.',
-        remedy: language === 'en' ? 'Apply copper-based fungicide.' : 'செம்பு அடிப்படையிலான பூஞ்சைக்கொல்லியை பயன்படுத்தவும்.',
-        prevention: language === 'en' ? 'Use disease-resistant varieties.' : 'நோய் எதிர்ப்பு ரகங்களை பயன்படுத்தவும்.',
-        confidence: 94
-      });
+      if (mode === 'soil') {
+        resolve({
+          isValidCrop: true,
+          isSoil: true,
+          soilType: language === 'en' ? 'Loamy Soil' : 'களிமண் நடுத்தர மண் (Loamy)',
+          characteristics: language === 'en' ? 'Good drainage, nutrient-rich, ideal for most plants.' : 'நல்ல நீர்ப்பிடிப்பு, சத்து மிகுந்தது.',
+          suitableCrops: language === 'en' ? 'Wheat, Sugarcane, Cotton, Vegetables' : 'கோதுமை, கரும்பு, பருத்தி, காய்கறிகள்',
+          waterRequirement: language === 'en' ? 'Medium' : 'நடுத்தரம்',
+          fertilizerSuggestions: language === 'en' ? 'Organic compost, NPK 10-10-10' : 'இயற்கை உரம், NPK 10-10-10',
+          confidence: 90
+        });
+      } else {
+        resolve({
+          isValidCrop: true,
+          isSoil: false,
+          multiLeaf: false,
+          severity: 'High',
+          disease: language === 'en' ? 'Late Blight' : 'தாமதமான கருகல் (Late Blight)',
+          symptoms: language === 'en' ? 'Dark brown spots on leaves, white mold on undersides.' : 'இலைகளில் அடர் பழுப்பு புள்ளிகள்.',
+          remedy: language === 'en' ? 'Apply copper-based fungicide.' : 'செம்பு அடிப்படையிலான பூஞ்சைக்கொல்லியை பயன்படுத்தவும்.',
+          prevention: language === 'en' ? 'Use disease-resistant varieties.' : 'நோய் எதிர்ப்பு ரகங்களை பயன்படுத்தவும்.',
+          confidence: 94
+        });
+      }
     }, 2000);
   });
 }

@@ -317,6 +317,27 @@ export const translations = {
     benefit_3_desc: 'குறைந்தபட்ச தொழில்நுட்ப அறிவு கொண்ட விவசாயிகளுக்காக வடிவமைக்கப்பட்ட எளிய இடைமுகம்.',
     benefit_4_title: 'எப்போதும் கிடைக்கும்',
     benefit_4_desc: 'உங்கள் தொலைபேசியிலிருந்து 24/7 AI-இயங்கும் கண்டறிதலை அணுகுங்கள்.',
+  },
+  hi: {
+    nav_home: 'होम', nav_about: 'हमारे बारे में', nav_features: 'सुविधाएं', nav_how: 'कैसे काम करता है', nav_contact: 'संपर्क करें', nav_login: 'लॉग इन', nav_signup: 'साइन अप', nav_dashboard: 'डैशबोर्ड', nav_logout: 'लॉग आउट',
+    dash_upload: 'अपलोड और विश्लेषण', dash_history: 'इतिहास', dash_notifications: 'सूचनाएं', dash_advice: 'फसल सलाह', dash_upload_title: 'फसल की छवि अपलोड करें', dash_upload_desc: 'AI विश्लेषण के लिए अपनी फसल की तस्वीर लें या छवि चुनें', dash_upload_btn: 'अपलोड करने के लिए क्लिक करें', dash_analyze: 'AI से विश्लेषण करें', dash_analyzing: 'विश्लेषण हो रहा है...',
+    result_disease: 'रोग का पता चला', result_symptoms: 'लक्षण', result_remedy: 'उपचार', result_prevention: 'रोकथाम', result_healthy: 'स्वस्थ फसल', result_healthy_msg: 'आपकी फसल स्वस्थ प्रतीत होती है! कोई बीमारी नहीं पाई गई।', result_not_crop: 'फसल नहीं मिली', result_not_crop_msg: 'तस्वीर में कोई वैध पौधा नहीं मिला।', result_uncertain: 'अनिश्चित परिणाम',
+    hero_title_1: 'स्मार्ट खेती', hero_title_2: 'यहाँ से शुरू होती है'
+  },
+  te: {
+    nav_home: 'హోమ్', nav_about: 'మా గురించి', nav_features: 'ఫీచర్లు', nav_how: 'ఎలా పనిచేస్తుంది', nav_contact: 'సంప్రదించండి', nav_login: 'లాగిన్', nav_signup: 'సైన్ అప్', nav_dashboard: 'డ్యాష్‌బోర్డ్', nav_logout: 'లాగౌట్',
+    dash_upload: 'అప్‌లోడ్ & విశ్లేషణ', dash_history: 'చరిత్ర', dash_notifications: 'నోటిఫికేషన్‌లు', dash_advice: 'పంట సలహా', dash_upload_title: 'పంట చిత్రాన్ని అప్‌లోడ్ చేయండి', dash_upload_desc: 'AI విశ్లేషణ కోసం మీ పంట చిత్రాన్ని ఎంచుకోండి', dash_upload_btn: 'అప్‌లోడ్ చేయడానికి క్లిక్ చేయండి', dash_analyze: 'AI తో విశ్లేషించండి', dash_analyzing: 'విశ్లేషిస్తోంది...',
+    result_disease: 'వ్యాధి కనుగొనబడింది', result_symptoms: 'లక్షణాలు', result_remedy: 'నివారణ', result_prevention: 'నివారణ చర్యలు', result_healthy: 'ఆరోగ్యకరమైన పంట', result_healthy_msg: 'మీ పంట ఆరోగ్యంగా ఉన్నట్లు కనిపిస్తోంది! వ్యాధులు కనుగొనబడలేదు.', result_not_crop: 'పంట కనుగొనబడలేదు', result_not_crop_msg: 'చిత్రంలో సరైన మొక్క లేదు.', result_uncertain: 'అనిశ్చిత ఫలితం'
+  },
+  kn: {
+    nav_home: 'ಮುಖಪುಟ', nav_about: 'ನಮ್ಮ ಬಗ್ಗೆ', nav_features: 'ವೈಶಿಷ್ಟ್ಯಗಳು', nav_how: 'ಹೇಗೆ ಕೆಲಸ ಮಾಡುತ್ತದೆ', nav_contact: 'ಸಂಪರ್ಕಿಸಿ', nav_login: 'ಲಾಗಿನ್', nav_signup: 'ಸೈನ್ ಅಪ್', nav_dashboard: 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', nav_logout: 'ಲಾಗೌಟ್',
+    dash_upload: 'ಅಪ್‌ಲೋಡ್ ಮತ್ತು ವಿಶ್ಲೇಷಣೆ', dash_history: 'ಇತಿಹಾಸ', dash_notifications: 'ಸೂಚನೆಗಳು', dash_advice: 'ಬೆಳೆ ಸಲಹೆ', dash_upload_title: 'ಬೆಳೆಯ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ', dash_upload_desc: 'AI ವಿಶ್ಲೇಷಣೆಗಾಗಿ ನಿಮ್ಮ ಬೆಳೆಯ ಚಿತ್ರವನ್ನು ಆರಿಸಿ', dash_upload_btn: 'ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಕ್ಲಿಕ್ ಮಾಡಿ', dash_analyze: 'AI ನೊಂದಿಗೆ ವಿಶ್ಲೇಷಿಸಿ', dash_analyzing: 'ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ...',
+    result_disease: 'ರೋಗ ಪತ್ತೆಯಾಗಿದೆ', result_symptoms: 'ಲಕ್ಷಣಗಳು', result_remedy: 'ಪರಿಹಾರ', result_prevention: 'ತಡೆಗಟ್ಟುವಿಕೆ', result_healthy: 'ಆರೋಗ್ಯಕರ ಬೆಳೆ', result_healthy_msg: 'ನಿಮ್ಮ ಬೆಳೆ ಆರೋಗ್ಯಕರವಾಗಿದೆ! ಯಾವುದೇ ರೋಗಗಳಿಲ್ಲ.', result_not_crop: 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ', result_not_crop_msg: 'ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಸಸ್ಯವಿಲ್ಲ.', result_uncertain: 'ಅನಿಶ್ಚಿತಿತ ಫಲಿತಾಂಶ'
+  },
+  ml: {
+    nav_home: 'ഹോം', nav_about: 'ഞങ്ങളെ കുറിച്ച്', nav_features: 'സവിശേഷതകൾ', nav_how: 'എങ്ങനെ പ്രവർത്തിക്കുന്നു', nav_contact: 'ബന്ധപ്പെടുക', nav_login: 'ലോഗിൻ', nav_signup: 'സൈൻ അപ്പ്', nav_dashboard: 'ഡാഷ്‌ബോർഡ്', nav_logout: 'ലോഗൗട്ട്',
+    dash_upload: 'അപ്‌ലോഡ് & വിശകലനം', dash_history: 'ചരിത്രം', dash_notifications: 'അറിയിപ്പുകൾ', dash_advice: 'വിള ഉപദേശം', dash_upload_title: 'വിളയുടെ ചിത്രം അപ്‌ലോഡ് ചെയ്യുക', dash_upload_desc: 'AI വിശകലനത്തിനായി നിങ്ങളുടെ വിളയുടെ ചിത്രം തിരഞ്ഞെടുക്കുക', dash_upload_btn: 'അപ്‌ലോഡ് ചെയ്യാൻ ക്ലിക്ക് ചെയ്യുക', dash_analyze: 'AI ഉപയോഗിച്ച് വിശകലനം ചെയ്യുക', dash_analyzing: 'വിശകലനം ചെയ്യുന്നു...',
+    result_disease: 'രോഗം കണ്ടെത്തി', result_symptoms: 'ലക്ഷണങ്ങൾ', result_remedy: 'പ്രതിവിധി', result_prevention: 'പ്രതിരോധം', result_healthy: 'ആരോഗ്യമുള്ള വിള', result_healthy_msg: 'നിങ്ങളുടെ വിളകൾക്ക് ആരോഗ്യമുണ്ട്! രോഗങ്ങളൊന്നും കണ്ടെത്തിയില്ല.', result_not_crop: 'വിള കണ്ടെത്തിയില്ല', result_not_crop_msg: 'ചിത്രത്തിൽ ചെടികളൊന്നും കണ്ടെത്തിയില്ല.', result_uncertain: 'അനിശ്ചിത ഫലം'
   }
 };
 
