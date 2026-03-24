@@ -14,7 +14,9 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // The user requested that if someone tries to enter without an account, they must "Sign in first" 
+    // (which in their terminology means Sign Up / register).
+    return <Navigate to="/signup" replace />;
   }
 
   return children;

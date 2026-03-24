@@ -1,5 +1,15 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { auth, googleProvider, signInWithRedirect, firebaseSignOut } from '../lib/firebase';
+import { 
+  auth, 
+  googleProvider, 
+  signInWithRedirect, 
+  firebaseSignOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  setPersistence,
+  browserLocalPersistence
+} from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const AuthContext = createContext({});
@@ -74,20 +84,44 @@ export function AuthProvider({ children }) {
   };
 
   const signUp = async (email, password, name) => {
-    const mockUser = { id: `mock-${Date.now()}`, email, name };
-    localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
-    setUser(mockUser);
+    if (auth.app.options.apiKey === "mock-key") {
+      const mockUser = { id: `mock-${Date.now()}`, email, name };
+      localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
+      setUser(mockUser);
+      setUserProfile({ name });
+      return { data: { user: mockUser } };
+    }
+    
+    await setPersistence(auth, browserLocalPersistence);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName: name });
+    
+    // For immediate UI update before onAuthStateChanged kicks in
+    setUser({ id: userCredential.user.uid, email: userCredential.user.email });
     setUserProfile({ name });
-    return { data: { user: mockUser } };
+    return userCredential;
   };
 
   const signIn = async (email, password) => {
-    const name = email.split('@')[0];
-    const mockUser = { id: `mock-${Date.now()}`, email, name };
-    localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
-    setUser(mockUser);
-    setUserProfile({ name });
-    return { data: { user: mockUser } };
+    if (auth.app.options.apiKey === "mock-key") {
+      const name = email.split('@')[0];
+      const mockUser = { id: `mock-${Date.now()}`, email, name };
+      localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
+      setUser(mockUser);
+      setUserProfile({ name });
+      return { data: { user: mockUser } };
+    }
+    
+    await setPersistence(auth, browserLocalPersistence);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    
+    // For immediate UI update
+    setUser({ id: userCredential.user.uid, email: userCredential.user.email });
+    setUserProfile({ 
+      name: userCredential.user.displayName || email.split('@')[0], 
+      photoURL: userCredential.user.photoURL 
+    });
+    return userCredential;
   };
 
   const signOut = async () => {

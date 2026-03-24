@@ -7,7 +7,7 @@ export const translations = {
     nav_how: 'How It Works',
     nav_contact: 'Contact',
     nav_login: 'Login',
-    nav_signup: 'Sign Up',
+    nav_signup: 'Sign in',
     nav_dashboard: 'Dashboard',
     nav_logout: 'Logout',
 
@@ -84,8 +84,8 @@ export const translations = {
     auth_signup: 'Create Account',
     auth_no_account: 'Don\'t have an account?',
     auth_has_account: 'Already have an account?',
-    auth_signup_link: 'Sign up',
-    auth_login_link: 'Sign in',
+    auth_signup_link: 'Sign in',
+    auth_login_link: 'Login',
 
     // Dashboard
     dash_upload: 'Upload & Analyze',

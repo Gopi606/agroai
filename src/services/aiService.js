@@ -19,10 +19,10 @@ export async function analyzeImage(imageUrl, language = 'en', mode = 'plant') {
 
   const systemInstruction = `You are an expert agricultural AI assistant parsing crop and soil images. You must analyze the image and respond with valid JSON ONLY.
 Follow these steps carefully:
-1. VALIDATE: Check if the image clearly contains what is expected based on the mode.
+2. VALIDATE: Check if the image clearly contains what is expected based on the mode.
    Mode is: ${mode.toUpperCase()}
-   - If mode is PLANT: Image must contain a plant/leaf. If not, return {"isValidCrop": false, "isSoil": false}.
-   - If mode is SOIL: Image must contain soil. If not, return {"isValidCrop": false, "isSoil": false}.
+   - If mode is PLANT: Image must contain a plant/leaf. If there is clearly no plant, return {"isValidCrop": false, "isSoil": false}.
+   - If mode is SOIL: Image must contain ANY form of soil, dirt, sand, or land (even if it is inside a bag, cup, hand, or container). If it is completely unrelated (e.g., a car, a face), return {"isValidCrop": false, "isSoil": false}.
 2. If mode is PLANT:
    - Identify the specific crop disease. If healthy, set disease to "Healthy". Assess severity as "Low", "Medium", or "High".
    - Set confidence score (0-100).
@@ -82,7 +82,7 @@ Example JSON for SOIL:
         'Authorization': `Bearer ${AI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'llama-3.2-90b-vision-preview',
         messages: [
           {
             role: 'user',

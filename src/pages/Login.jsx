@@ -41,10 +41,18 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-          <div style={{ fontSize: '3rem', marginBottom: 'var(--space-2)' }}>🌿</div>
-          <h2>{t('login_title')}</h2>
-          <p className="auth-subtitle">{t('login_subtitle')}</p>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: 'var(--space-6)' }}>
+          <Link to="/login" style={{ flex: 1, textAlign: 'center', padding: '1rem', fontWeight: 'bold', color: 'var(--green-400)', borderBottom: '3px solid var(--green-400)', textDecoration: 'none' }}>
+            Login
+          </Link>
+          <Link to="/signup" style={{ flex: 1, textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', textDecoration: 'none' }}>
+            Sign in
+          </Link>
+        </div>
+
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-4)' }}>
+          <h2>{t('login_title') || 'Welcome Back'}</h2>
+          <p className="auth-subtitle">{t('login_subtitle') || 'Login to your account'}</p>
         </div>
 
         {error && (
