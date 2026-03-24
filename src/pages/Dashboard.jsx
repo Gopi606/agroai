@@ -113,6 +113,11 @@ export default function Dashboard() {
       return;
     }
 
+    if (file.size === 0) {
+      setResultError('Invalid image');
+      return;
+    }
+
     if (file.size > 10 * 1024 * 1024) {
       setResultError('Image must be less than 10MB.');
       return;
@@ -415,7 +420,7 @@ export default function Dashboard() {
                     {!previewUrl ? (
                       <>
                         <span className="upload-icon">📸</span>
-                        <h3>{t('dash_upload_btn')}</h3>
+                        <h3>Upload Image</h3>
                         <p>{t('dash_upload_hint')}</p>
                         <div 
                           style={{ marginTop: 'var(--space-6)' }} 
@@ -425,7 +430,7 @@ export default function Dashboard() {
                           }}
                         >
                           <button className="btn btn-secondary" type="button">
-                            📹 Open Camera
+                            📸 Open Camera
                           </button>
                         </div>
                       </>

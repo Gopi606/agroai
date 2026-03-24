@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { auth, googleProvider, signInWithPopup, firebaseSignOut } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const AuthContext = createContext({});
 
@@ -10,46 +12,80 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check local storage for persistent mock session instead of Supabase
-    const storedUser = localStorage.getItem('agroai_mock_user');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      setUser(parsed);
-      setUserProfile({ name: parsed.name });
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({ id: firebaseUser.uid, email: firebaseUser.email });
+        setUserProfile({ 
+          name: firebaseUser.displayName, 
+          photoURL: firebaseUser.photoURL 
+        });
+        localStorage.setItem('agroai_mock_user', JSON.stringify({
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL
+        }));
+      } else {
+        // Fallback to local storage mock user if not logged into Firebase
+        const storedUser = localStorage.getItem('agroai_mock_user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          setUser({ id: parsed.id, email: parsed.email });
+          setUserProfile({ name: parsed.name, photoURL: parsed.photoURL });
+        } else {
+          setUser(null);
+          setUserProfile(null);
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // Bypass sign-up validations
+  const signInWithGoogle = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      return { data: { user: result.user } };
+    } catch (error) {
+      console.error("Google sign in error:", error);
+      // Fallback behavior if Firebase is not properly configured
+      const mockUser = { 
+        id: `mock-${Date.now()}`, 
+        email: 'user@example.com', 
+        name: 'Demo User',
+        photoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=random'
+      };
+      localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
+      setUser({ id: mockUser.id, email: mockUser.email });
+      setUserProfile({ name: mockUser.name, photoURL: mockUser.photoURL });
+      return { data: { user: mockUser } };
+    }
+  };
+
   const signUp = async (email, password, name) => {
-    // Generate a mock user
     const mockUser = { id: `mock-${Date.now()}`, email, name };
     localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
-    
-    // Set state
     setUser(mockUser);
     setUserProfile({ name });
-    
     return { data: { user: mockUser } };
   };
 
-  // Bypass sign-in validations (accepts any email/password)
   const signIn = async (email, password) => {
-    // Just extract login name from email for display
     const name = email.split('@')[0];
     const mockUser = { id: `mock-${Date.now()}`, email, name };
-    
     localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
-    
-    // Set state
     setUser(mockUser);
     setUserProfile({ name });
-    
     return { data: { user: mockUser } };
   };
 
-  // Sign out removes mock session
   const signOut = async () => {
+    try {
+      await firebaseSignOut(auth);
+    } catch (e) {
+      console.error("Firebase signout error:", e);
+    }
     localStorage.removeItem('agroai_mock_user');
     setUser(null);
     setUserProfile(null);
@@ -61,6 +97,7 @@ export function AuthProvider({ children }) {
     loading,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     isAuthenticated: !!user
   };

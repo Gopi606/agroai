@@ -106,7 +106,7 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       const canvas = canvasRef.current;
       
       if (video.readyState !== 4 || video.videoWidth === 0) {
-        setError('Camera not ready. Please wait.');
+        setError('Camera initializing... please wait');
         return;
       }
 
@@ -124,7 +124,7 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
         }
       }
       if (isBlack) {
-        setError("Unable to capture image. Try again.");
+        setError("Failed to capture image. Try again");
         return;
       }
       
@@ -279,7 +279,7 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
                     border: '2px solid rgba(255,255,255,0.8)',
                     cursor: 'pointer'
                   }}>
-                  {isScanning ? '🛑 Stop Scan' : '▶️ Start Scan'}
+                  {isScanning ? '⏹️ Stop' : '▶️ Start Live Scan'}
                 </button>
               )}
 

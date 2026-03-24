@@ -6,7 +6,8 @@ import { useLanguage } from '../context/LanguageContext';
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { user, signOut } = useAuth();
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const { user, userProfile, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
@@ -104,7 +105,73 @@ export default function Navbar() {
                 <Link to="/signup" className="btn btn-primary btn-sm desktop-only">{t('nav_signup')}</Link>
               </>
             ) : (
-              <button onClick={handleSignOut} className="btn btn-secondary btn-sm desktop-only">{t('nav_logout')}</button>
+              <div className="profile-dropdown-container desktop-only" style={{ position: 'relative' }}>
+                <button 
+                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid var(--green-500)',
+                    borderRadius: 'var(--radius-full)',
+                    cursor: 'pointer',
+                    color: 'var(--text-color)',
+                    padding: '0.25rem 1rem 0.25rem 0.25rem',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.1)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
+                >
+                  <img 
+                    src={userProfile?.photoURL || `https://ui-avatars.com/api/?name=${userProfile?.name || 'User'}&background=10b981&color=fff`} 
+                    alt="Profile" 
+                    style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                  <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{userProfile?.name || 'User'}</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--green-400)' }}>▼</span>
+                </button>
+                
+                {profileMenuOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '0.5rem',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-lg)',
+                    minWidth: '220px',
+                    boxShadow: 'var(--glow-green)',
+                    overflow: 'hidden',
+                    zIndex: 100
+                  }}>
+                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)' }}>
+                      <p style={{ margin: 0, fontWeight: 600 }}>{userProfile?.name || 'User'}</p>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>{user?.email || ''}</p>
+                    </div>
+                    <div style={{ padding: '0.5rem' }}>
+                      <Link 
+                        to="/dashboard" 
+                        style={{ display: 'block', padding: '0.75rem 1rem', color: 'var(--text-color)', textDecoration: 'none', borderRadius: 'var(--radius-md)', transition: 'background 0.2s' }} 
+                        onClick={() => setProfileMenuOpen(false)}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        📊 Dashboard
+                      </Link>
+                      <button 
+                        onClick={() => { setProfileMenuOpen(false); handleSignOut(); }}
+                        style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '0.75rem 1rem', color: 'var(--red-400)', cursor: 'pointer', borderRadius: 'var(--radius-md)', transition: 'background 0.2s', marginTop: '0.25rem' }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        🚪 Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             <button 

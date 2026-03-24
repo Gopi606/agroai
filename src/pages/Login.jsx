@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 
 export default function Login() {
   const { t } = useLanguage();
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -99,10 +99,37 @@ export default function Login() {
           <button 
             type="submit" 
             className="btn btn-primary btn-lg"
-            style={{ width: '100%' }}
+            style={{ width: '100%', marginBottom: '1rem' }}
             disabled={loading}
           >
             {loading ? '⏳ Signing in...' : `🔐 ${t('auth_login')}`}
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', margin: '1rem 0', color: 'var(--text-muted)' }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+            <span style={{ padding: '0 1rem', fontSize: 'var(--fs-sm)' }}>OR</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+          </div>
+          
+          <button
+            type="button"
+            className="btn btn-secondary btn-lg"
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}
+            onClick={async () => {
+              setLoading(true);
+              try {
+                await signInWithGoogle();
+                navigate('/dashboard');
+              } catch (err) {
+                setError('Failed to sign in with Google');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{width: '24px', height: '24px'}} />
+            Sign in with Google
           </button>
         </form>
 
