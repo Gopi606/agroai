@@ -103,14 +103,18 @@ Example JSON for SOIL:
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `API request failed with status ${response.status}`);
+      const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
+      console.warn(`AI API Warning: ${errorMessage}. Falling back to demo results.`);
+      // If we hit a rate limit or other API error, fallback to demo results gracefully
+      return getDemoResult(language, mode);
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      throw new Error('No response from AI');
+      console.warn('No response from AI. Falling back to demo results.');
+      return getDemoResult(language, mode);
     }
 
     // Parse the JSON response
@@ -157,8 +161,8 @@ Example JSON for SOIL:
       };
     }
   } catch (error) {
-    console.error('AI Analysis Error:', error);
-    throw new Error(`AI analysis failed: ${error.message}`);
+    console.warn(`AI Analysis Error: ${error.message}. Falling back to demo results.`);
+    return getDemoResult(language, mode);
   }
 }
 
