@@ -24,14 +24,17 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.onloadedmetadata = () => {
+          setCameraActive(true);
+        };
       }
-      setCameraActive(true);
     } catch (err) {
       console.error('Error accessing camera:', err);
       setError('Could not access the camera. Please allow permissions.');
       setCameraActive(false);
     }
   }, [facingMode]);
+
 
   useEffect(() => {
     startCamera();
@@ -64,11 +67,30 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
     if (videoRef.current && canvasRef.current && isLive) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
+      
+      if (video.readyState !== 4 || video.videoWidth === 0) {
+        return;
+      }
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
+      const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let isBlack = true;
+      // sampling pixels for faster check
+      for (let i = 0; i < frameData.length; i += 40) {
+        if (frameData[i] > 10 || frameData[i+1] > 10 || frameData[i+2] > 10) {
+          isBlack = false;
+          break;
+        }
+      }
+      if (isBlack) {
+        console.warn("Black frame detected, skipping live capture.");
+        return;
+      }
+
       canvas.toBlob((blob) => {
         if (blob && onFrame) {
           const file = new File([blob], "live_frame.jpg", { type: "image/jpeg" });
@@ -83,10 +105,28 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
+      if (video.readyState !== 4 || video.videoWidth === 0) {
+        setError('Camera not ready. Please wait.');
+        return;
+      }
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let isBlack = true;
+      for (let i = 0; i < frameData.length; i += 40) {
+        if (frameData[i] > 10 || frameData[i+1] > 10 || frameData[i+2] > 10) {
+          isBlack = false;
+          break;
+        }
+      }
+      if (isBlack) {
+        setError("Unable to capture image. Try again.");
+        return;
+      }
       
       // Compress image
       canvas.toBlob((blob) => {

@@ -119,9 +119,13 @@ export default function Dashboard() {
     }
 
     setSelectedFile(file);
-    setPreviewUrl(getLocalImageUrl(file));
-    setResult(null);
-    setResultError('');
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result);
+      setResult(null);
+      setResultError('');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDrop = (e) => {
@@ -152,7 +156,10 @@ export default function Dashboard() {
 
   // Analyze image
   const handleAnalyze = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile && !previewUrl) {
+      setResultError('Invalid image captured');
+      return;
+    }
     
     setUploading(true);
     setResultError('');
@@ -369,8 +376,8 @@ export default function Dashboard() {
                   </div>
                   
                   <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button className={`btn ${inputMode === 'upload' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('upload')}>📤 Upload</button>
-                    <button className={`btn ${inputMode === 'camera' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('camera')}>📸 Camera</button>
+                    <button className={`btn ${inputMode === 'upload' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('upload')}>📤 Upload Image</button>
+                    <button className={`btn ${inputMode === 'camera' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('camera')}>📸 Open Camera</button>
                     <button className={`btn ${inputMode === 'live' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setInputMode('live')}>🔴 Live Video</button>
                   </div>
                 </div>
@@ -432,7 +439,7 @@ export default function Dashboard() {
                 )}
 
                 {/* Analyze Button */}
-                {selectedFile && !uploading && (
+                {previewUrl && !uploading && (
                   <div style={{ textAlign: 'center', marginTop: 'var(--space-6)' }}>
                     <button 
                       className="btn btn-primary btn-lg"
