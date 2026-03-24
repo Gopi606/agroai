@@ -116,6 +116,11 @@ export const translations = {
     result_prevention: 'Prevention Tips',
     result_healthy: 'Healthy Crop',
     result_healthy_msg: 'Your crop appears to be healthy! No diseases detected.',
+    result_not_crop: 'Crop Not Detected',
+    result_not_crop_msg: 'We could not detect a valid plant leaf in this image. Please ensure you take a clear photo of the crop.',
+    result_uncertain: 'Uncertain Result',
+    result_uncertain_msg: 'The AI is not confident about this result. Please capture a clearer or closer image of the affected area.',
+    result_multi_leaf: 'Multiple leaves detected. Analyzing the most prominent leaf.',
 
     // Footer
     footer_tagline: 'Transforming Agriculture with Intelligence',
@@ -271,6 +276,11 @@ export const translations = {
     result_prevention: 'தடுப்பு குறிப்புகள்',
     result_healthy: 'ஆரோக்கியமான பயிர்',
     result_healthy_msg: 'உங்களது பயிர் ஆரோக்கியமாக உள்ளது! நோய்கள் எதுவும் கண்டறியப்படவில்லை.',
+    result_not_crop: 'பயிர் கண்டறியப்படவில்லை',
+    result_not_crop_msg: 'இந்தப் படத்தில் தகுதியான தாவர இலையைக் கண்டுபிடிக்க முடியவில்லை. தயவு செய்து பயிரின் தெளிவான புகைப்படத்தை எடுக்கவும்.',
+    result_uncertain: 'உறுதியற்ற முடிவு',
+    result_uncertain_msg: 'AI-க்கு இந்த முடிவில் போதிய நம்பிக்கை இல்லை. தயவுசெய்து பாதிக்கப்பட்ட பகுதியை நெருக்கமாகப் படம் பிடிக்கவும்.',
+    result_multi_leaf: 'பல இலைகள் கண்டறியப்பட்டன. முக்கிய இலையை மட்டும் பகுப்பாய்வு செய்கிறோம்.',
 
     // Footer
     footer_tagline: 'நுண்ணறிவு மூலம் வேளாண்மையை மாற்றுதல்',

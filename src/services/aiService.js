@@ -7,13 +7,36 @@ export async function analyzeImage(imageUrl, language = 'en') {
     return getDemoResult(language);
   }
 
-  const tamilPrefix = language === 'ta' 
-    ? 'CRITICAL INSTRUCTION: You MUST write ALL values (disease, symptoms, remedy, prevention) in Tamil (தமிழ்) language ONLY. Do NOT use English for any field values.\n\n' 
-    : '';
+  const languageNames = {
+    'en': 'English',
+    'ta': 'Tamil (தமிழ்)',
+    'hi': 'Hindi (हिंदी)',
+    'te': 'Telugu (తెలుగు)',
+    'kn': 'Kannada (ಕನ್ನಡ)',
+    'ml': 'Malayalam (മലയാളം)'
+  };
+  const targetLanguage = languageNames[language] || 'English';
 
-  const tamilSuffix = language === 'ta'
-    ? '\n\nREMINDER: ALL field values in the JSON must be in Tamil (தமிழ்). Write disease name, symptoms, remedy, and prevention entirely in Tamil language.'
-    : '';
+  const systemInstruction = `You are an expert agricultural AI assistant. You must analyze the image and respond with valid JSON ONLY.
+Follow these steps carefully:
+1. VALIDATE: Check if the image clearly contains a plant or crop leaf. If it is a human, animal, object, or random photo, you MUST return exactly: {"isValidCrop": false}.
+2. LEAF COUNT: Look at the number of leaves. If there are multiple distinct leaves or a whole plant, set "multiLeaf": true, and analyze only the most prominent leaf. Otherwise set "multiLeaf": false.
+3. ANALYSIS: Identify the specific crop disease. If healthy, set disease to "Healthy". Assess the severity as "Low", "Medium", or "High".
+4. CONFIDENCE: Give a confidence score (0-100).
+5. TREATMENT: Provide detailed symptoms. For remedy, provide a detailed paragraph including both organic AND chemical treatments. Provide detailed prevention tips.
+6. TRANSLATION: ALL text fields (disease, symptoms, remedy, prevention, severity) MUST be completely translated into ${targetLanguage}. Do not use English unless the target is English.
+
+Example JSON output format for a valid crop:
+{
+  "isValidCrop": true,
+  "multiLeaf": true,
+  "disease": "[Disease Name in ${targetLanguage}]",
+  "confidence": 85,
+  "severity": "[Low/Medium/High in ${targetLanguage}]",
+  "symptoms": "[Detailed symptoms in ${targetLanguage}]",
+  "remedy": "[Detailed organic and chemical remedy in ${targetLanguage}]",
+  "prevention": "[Detailed prevention tips in ${targetLanguage}]"
+}`;
 
   try {
     // Convert image to base64 if it's a blob/object URL
@@ -40,7 +63,7 @@ export async function analyzeImage(imageUrl, language = 'en') {
             content: [
               {
                 type: 'text',
-                text: `${tamilPrefix}You are an expert agricultural AI assistant. Analyze this crop image and provide:\n1. Disease name (if any, or "Healthy" if no disease)\n2. Symptoms observed (describe in detail)\n3. Remedy - write as a detailed paragraph with multiple sentences explaining treatment steps clearly for a farmer\n4. Prevention tips - write as a detailed paragraph with multiple sentences explaining how to prevent this disease\n5. Confidence level (as percentage)\n\nIMPORTANT: Remedy and Prevention MUST be detailed paragraphs (3-5 sentences each), NOT short one-liners. Keep language simple and farmer-friendly.\n\nRespond ONLY with valid JSON:\n{"disease": "...", "symptoms": "...", "remedy": "A detailed paragraph...", "prevention": "A detailed paragraph...", "confidence": 85}${tamilSuffix}`
+                text: systemInstruction
               },
               imageContent
             ]
@@ -71,6 +94,9 @@ export async function analyzeImage(imageUrl, language = 'en') {
       const result = JSON.parse(cleanedContent);
 
       return {
+        isValidCrop: result.isValidCrop !== false,
+        multiLeaf: !!result.multiLeaf,
+        severity: result.severity || 'Unknown',
         disease: result.disease || 'Unknown',
         symptoms: result.symptoms || 'Unable to determine symptoms',
         remedy: result.remedy || 'Consult a local agricultural expert',
@@ -80,6 +106,9 @@ export async function analyzeImage(imageUrl, language = 'en') {
     } catch (parseError) {
       // If JSON parsing fails, try to extract info from plain text
       return {
+        isValidCrop: !content.includes('"isValidCrop": false') && !content.toLowerCase().includes('not a crop'),
+        multiLeaf: content.includes('"multiLeaf": true') || content.toLowerCase().includes('multiple leaves'),
+        severity: extractField(content, 'severity') || 'Unknown',
         disease: extractField(content, 'disease') || 'Analysis Complete',
         symptoms: extractField(content, 'symptoms') || content.substring(0, 200),
         remedy: extractField(content, 'remedy') || 'Consult a local agricultural expert',
@@ -121,23 +150,18 @@ function getDemoResult(language) {
   // Simulate API delay
   return new Promise((resolve) => {
     setTimeout(() => {
-      if (language === 'ta') {
-        resolve({
-          disease: 'தாமதமான கருகல் (Late Blight)',
-          symptoms: 'இலைகளில் அடர் பழுப்பு புள்ளிகள், அடிப்பகுதியில் வெள்ளை பூஞ்சை, வேகமாக பரவும் புண்கள்.',
-          remedy: 'உடனடியாக செம்பு அடிப்படையிலான பூஞ்சைக்கொல்லியை பயன்படுத்தவும். பாதிக்கப்பட்ட இலைகளை அகற்றி அழிக்கவும். மேல்நிலை நீர்ப்பாசனத்தை தவிர்க்கவும்.',
-          prevention: 'நோய் எதிர்ப்பு ரகங்களை பயன்படுத்தவும். காற்று சுழற்சிக்கு சரியான இடைவெளி உறுதி செய்யவும். மழைக்காலத்திற்கு முன் தடுப்பு பூஞ்சைக்கொல்லி பயன்படுத்தவும்.',
-          confidence: 94
-        });
-      } else {
-        resolve({
-          disease: 'Late Blight',
-          symptoms: 'Dark brown spots on leaves, white mold on undersides, rapidly spreading lesions that can destroy foliage within days.',
-          remedy: 'Apply copper-based fungicide immediately. Remove and destroy affected leaves. Avoid overhead irrigation. Ensure proper drainage.',
-          prevention: 'Use disease-resistant varieties. Ensure proper spacing for air circulation. Apply preventive fungicide before rainy season. Rotate crops annually.',
-          confidence: 94
-        });
-      }
+      if (!languageNames[language]) language = 'en';
+      
+      resolve({
+        isValidCrop: true,
+        multiLeaf: false,
+        severity: 'High',
+        disease: language === 'en' ? 'Late Blight' : 'தாமதமான கருகல் (Late Blight)',
+        symptoms: language === 'en' ? 'Dark brown spots on leaves, white mold on undersides.' : 'இலைகளில் அடர் பழுப்பு புள்ளிகள்.',
+        remedy: language === 'en' ? 'Apply copper-based fungicide.' : 'செம்பு அடிப்படையிலான பூஞ்சைக்கொல்லியை பயன்படுத்தவும்.',
+        prevention: language === 'en' ? 'Use disease-resistant varieties.' : 'நோய் எதிர்ப்பு ரகங்களை பயன்படுத்தவும்.',
+        confidence: 94
+      });
     }, 2000);
   });
 }

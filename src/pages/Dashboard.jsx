@@ -22,6 +22,8 @@ export default function Dashboard() {
   const [uploading, setUploading] = useState(false);
   const [dragover, setDragover] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+  const voiceSynthesis = window.speechSynthesis;
 
   // Result state
   const [result, setResult] = useState(null);
@@ -120,6 +122,8 @@ export default function Dashboard() {
     setResult(null);
     setResultError('');
     if (fileInputRef.current) fileInputRef.current.value = '';
+    voiceSynthesis.cancel();
+    setIsPlayingVoice(false);
   };
 
   // Analyze image
@@ -169,6 +173,9 @@ export default function Dashboard() {
     if (item.results && item.results.length > 0) {
       const r = item.results[0];
       setResult({
+        isValidCrop: r.isValidCrop !== false,
+        multiLeaf: r.multiLeaf || false,
+        severity: r.severity || '',
         disease: r.disease,
         symptoms: r.symptoms,
         remedy: r.remedy,
@@ -178,6 +185,38 @@ export default function Dashboard() {
       setPreviewUrl(item.image_url);
       setActiveTab('upload');
     }
+  };
+
+  const playVoice = () => {
+    if (!result) return;
+    
+    if (isPlayingVoice) {
+      voiceSynthesis.cancel();
+      setIsPlayingVoice(false);
+      return;
+    }
+
+    const langMap = {
+      'en': 'en-US',
+      'ta': 'ta-IN',
+      'hi': 'hi-IN',
+      'te': 'te-IN',
+      'kn': 'kn-IN',
+      'ml': 'ml-IN'
+    };
+
+    const textToRead = result.disease === 'Healthy' 
+      ? t('result_healthy_msg')
+      : `${result.disease}. ${t('result_symptoms')}: ${result.symptoms}. ${t('result_remedy')}: ${result.remedy}`;
+
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utterance.lang = langMap[language] || 'en-US';
+    
+    utterance.onend = () => setIsPlayingVoice(false);
+    utterance.onerror = () => setIsPlayingVoice(false);
+
+    voiceSynthesis.speak(utterance);
+    setIsPlayingVoice(true);
   };
 
   const tabs = [
@@ -352,58 +391,125 @@ export default function Dashboard() {
                 {/* Result */}
                 {result && (
                   <div style={{ marginTop: 'var(--space-6)' }}>
-                    <div className="result-card">
-                      <div className="result-header">
-                        <div>
-                          <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-                            {t('result_disease')}
-                          </p>
-                          <h3 className="result-disease">
-                            {result.disease === 'Healthy' ? `✅ ${t('result_healthy')}` : `🔍 ${result.disease}`}
-                          </h3>
+                    {!result.isValidCrop ? (
+                      <div className="result-card" style={{ borderLeft: '4px solid var(--red-500)' }}>
+                        <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>❓</div>
+                          <h3 style={{ color: 'var(--red-400)', marginBottom: 'var(--space-2)' }}>{t('result_not_crop')}</h3>
+                          <p>{t('result_not_crop_msg')}</p>
                         </div>
-                        {result.confidence && (
-                          <span className="result-confidence">
-                            📊 {result.confidence}%
-                          </span>
-                        )}
                       </div>
-
-                      {result.disease === 'Healthy' ? (
-                        <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-                          <div style={{ fontSize: '4rem', marginBottom: 'var(--space-4)' }}>🎉</div>
-                          <p style={{ color: 'var(--green-400)', fontSize: 'var(--fs-lg)' }}>
-                            {t('result_healthy_msg')}
-                          </p>
+                    ) : result.confidence < 60 ? (
+                      <div className="result-card" style={{ borderLeft: '4px solid var(--yellow-500)' }}>
+                        <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>⚠️</div>
+                          <h3 style={{ color: 'var(--yellow-400)', marginBottom: 'var(--space-2)' }}>{t('result_uncertain')}</h3>
+                          <p>{t('result_uncertain_msg')}</p>
                         </div>
-                      ) : (
-                        <div className="result-sections">
-                          <div className="result-section">
-                            <div className="result-section-icon symptoms">⚠️</div>
-                            <div className="result-section-content">
-                              <h4>{t('result_symptoms')}</h4>
-                              <p>{result.symptoms}</p>
+                      </div>
+                    ) : (
+                      <>
+                        {result.multiLeaf && (
+                          <div style={{ 
+                            marginBottom: 'var(--space-4)', 
+                            padding: 'var(--space-3)', 
+                            background: 'rgba(59, 130, 246, 0.1)', 
+                            borderLeft: '4px solid var(--blue-500)',
+                            borderRadius: 'var(--radius-md)'
+                          }}>
+                            ℹ️ {t('result_multi_leaf')}
+                          </div>
+                        )}
+                        <div className="result-card">
+                          <div className="result-header">
+                            <div>
+                              <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                                {t('result_disease')}
+                              </p>
+                              <h3 className="result-disease" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                {result.disease === 'Healthy' ? `✅ ${t('result_healthy')}` : `🔍 ${result.disease}`}
+                                <button 
+                                  onClick={playVoice}
+                                  className="btn-secondary"
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '50%',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1rem',
+                                    border: '1px solid var(--border-color)',
+                                    background: isPlayingVoice ? 'var(--green-500)' : 'transparent',
+                                  }}
+                                  title={isPlayingVoice ? "Stop Voice" : "Read Aloud"}
+                                >
+                                  {isPlayingVoice ? '⏸️' : '🔊'}
+                                </button>
+                              </h3>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              {result.confidence && (
+                                <span className="result-confidence">
+                                  📊 {result.confidence}%
+                                </span>
+                              )}
+                              {result.severity && result.disease !== 'Healthy' && (
+                                <div style={{ 
+                                  marginTop: '0.5rem', 
+                                  fontSize: 'var(--fs-xs)',
+                                  padding: '0.2rem 0.6rem',
+                                  borderRadius: 'var(--radius-full)',
+                                  display: 'inline-block',
+                                  background: String(result.severity).toLowerCase().includes('high') ? 'rgba(239, 68, 68, 0.2)' : 
+                                              String(result.severity).toLowerCase().includes('med') ? 'rgba(245, 158, 11, 0.2)' : 
+                                              'rgba(16, 185, 129, 0.2)',
+                                  color: String(result.severity).toLowerCase().includes('high') ? 'var(--red-400)' : 
+                                         String(result.severity).toLowerCase().includes('med') ? 'var(--yellow-400)' : 
+                                         'var(--green-400)'
+                                }}>
+                                  Severity: {result.severity}
+                                </div>
+                              )}
                             </div>
                           </div>
 
-                          <div className="result-section">
-                            <div className="result-section-icon remedy">💊</div>
-                            <div className="result-section-content">
-                              <h4>{t('result_remedy')}</h4>
-                              <p>{result.remedy}</p>
+                          {result.disease === 'Healthy' ? (
+                            <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
+                              <div style={{ fontSize: '4rem', marginBottom: 'var(--space-4)' }}>🎉</div>
+                              <p style={{ color: 'var(--green-400)', fontSize: 'var(--fs-lg)' }}>
+                                {t('result_healthy_msg')}
+                              </p>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="result-sections">
+                              <div className="result-section">
+                                <div className="result-section-icon symptoms">⚠️</div>
+                                <div className="result-section-content">
+                                  <h4>{t('result_symptoms')}</h4>
+                                  <p>{result.symptoms}</p>
+                                </div>
+                              </div>
 
-                          <div className="result-section">
-                            <div className="result-section-icon prevention">🛡️</div>
-                            <div className="result-section-content">
-                              <h4>{t('result_prevention')}</h4>
-                              <p>{result.prevention}</p>
+                              <div className="result-section">
+                                <div className="result-section-icon remedy">💊</div>
+                                <div className="result-section-content">
+                                  <h4>{t('result_remedy')}</h4>
+                                  <p>{result.remedy}</p>
+                                </div>
+                              </div>
+
+                              <div className="result-section">
+                                <div className="result-section-icon prevention">🛡️</div>
+                                <div className="result-section-content">
+                                  <h4>{t('result_prevention')}</h4>
+                                  <p>{result.prevention}</p>
+                                </div>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
