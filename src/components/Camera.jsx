@@ -18,10 +18,20 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
     }
 
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false,
-      });
+      let mediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false,
+        });
+      } catch (e) {
+        // Fallback to any available camera if primary rear camera fails
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+      
       setStream(mediaStream);
       if (videoRef.current) {
         // Explicitly set muted & playsInline for strict mobile browsers (iOS Safari)
@@ -29,25 +39,31 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
         videoRef.current.setAttribute('muted', 'true');
         videoRef.current.srcObject = mediaStream;
         
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play()
-            .then(() => {
+        videoRef.current.play().catch(e => console.warn('Play interrupted', e));
+
+        let attempts = 0;
+        const checkReady = () => {
+          if (videoRef.current) {
+            // Some mobile browsers lag on videoWidth, check readyState or currentTime
+            const isPlaying = videoRef.current.readyState >= 2 || videoRef.current.currentTime > 0;
+            if (isPlaying || videoRef.current.videoWidth > 0) {
               setCameraActive(true);
-              // Ensure video actually has dimensions before declaring ready
-              const checkDimensions = () => {
-                if (videoRef.current && videoRef.current.videoWidth > 0) {
-                  setIsReady(true);
-                } else {
-                  requestAnimationFrame(checkDimensions);
-                }
-              };
-              checkDimensions();
-            })
-            .catch((err) => {
-              console.error('Video play failed:', err);
-              setError('Failed to play video feed. Check browser permissions.');
-            });
+              setIsReady(true);
+              return;
+            }
+          }
+          
+          if (attempts < 80) { // Try for 8 seconds (80 * 100ms)
+            attempts++;
+            setTimeout(checkReady, 100);
+          } else {
+            console.warn('Camera feed timeout check failed, forcing ready state anyway.');
+            // Force it to be ready so the user gets access to the native Video element
+            setCameraActive(true);
+            setIsReady(true);
+          }
         };
+        setTimeout(checkReady, 300);
       }
     } catch (err) {
       console.error('Error accessing camera:', err);

@@ -43,25 +43,33 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
+  const resolveMockUser = () => {
+    const mockUser = { 
+      id: `mock-${Date.now()}`, 
+      email: 'demo@agroai.app', 
+      name: 'Farmer (Demo Account)',
+      photoURL: 'https://ui-avatars.com/api/?name=Farmer&background=random'
+    };
+    localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
+    setUser({ id: mockUser.id, email: mockUser.email });
+    setUserProfile({ name: mockUser.name, photoURL: mockUser.photoURL });
+    return { data: { user: mockUser } };
+  };
+
   const signInWithGoogle = async () => {
     try {
-      // Using Redirect instead of Popup to bypass mobile browser popup blockers
+      if (auth.app.options.apiKey === "mock-key") {
+        console.warn("Using mock user because Firebase API key is missing.");
+        return resolveMockUser();
+      }
+      
+      // We must use Redirect here on mobile due to strict browser popup blockers
       await signInWithRedirect(auth, googleProvider);
-      // The browser will redirect away. The logic in Login.jsx and onAuthStateChanged will handle the return trip.
+      // The browser navigates away immediately. We rely on onAuthStateChanged to pick up the user on return.
       return { data: { user: null } };
     } catch (error) {
-      console.error("Google sign in error:", error);
-      // Fallback behavior if Firebase is not properly configured
-      const mockUser = { 
-        id: `mock-${Date.now()}`, 
-        email: 'user@example.com', 
-        name: 'Demo User',
-        photoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=random'
-      };
-      localStorage.setItem('agroai_mock_user', JSON.stringify(mockUser));
-      setUser({ id: mockUser.id, email: mockUser.email });
-      setUserProfile({ name: mockUser.name, photoURL: mockUser.photoURL });
-      return { data: { user: mockUser } };
+      console.error("Google sign in redirect error:", error);
+      return resolveMockUser();
     }
   };
 
