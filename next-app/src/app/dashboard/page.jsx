@@ -1,13 +1,24 @@
+"use client";
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { analyzeImage } from '../services/aiService';
-import { uploadImage, saveUploadRecord, saveResult, getHistory, getLocalImageUrl } from '../services/uploadService';
-import { getNotifications, getDefaultNotifications, getSeasonalAdvice } from '../services/notificationService';
-import LoadingSpinner from '../components/LoadingSpinner';
-import MarketPrediction from '../components/MarketPrediction';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { analyzeImage } from '../../services/aiService';
+import { uploadImage, saveUploadRecord, saveResult, getHistory, getLocalImageUrl } from '../../services/uploadService';
+import { getNotifications, getDefaultNotifications, getSeasonalAdvice } from '../../services/notificationService';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import MarketPrediction from '../../components/MarketPrediction';
+import ProtectedRoute from '../../components/ProtectedRoute';
+import CameraCapture from '../../components/CameraCapture';
 
-export default function Dashboard() {
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  );
+}
+
+function Dashboard() {
   const { user, userProfile } = useAuth();
   const { t, language } = useLanguage();
   const fileInputRef = useRef(null);
@@ -20,6 +31,7 @@ export default function Dashboard() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [dragover, setDragover] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
 
   // Result state
   const [result, setResult] = useState(null);
@@ -117,7 +129,22 @@ export default function Dashboard() {
     setPreviewUrl(null);
     setResult(null);
     setResultError('');
+    setShowCamera(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCameraCapture = (file) => {
+    setShowCamera(false);
+    processFile(file);
+    if (!navigator.onLine) {
+      setResultError('You are currently offline. Image saved locally. Analysis will run when connection is restored.');
+      // Offline fallback: save upload locally without AI process yet
+      if (user) {
+        uploadImage(file, user.id).then(imageUrl => {
+          saveUploadRecord(user.id, imageUrl);
+        });
+      }
+    }
   };
 
   // Analyze image
@@ -156,24 +183,30 @@ export default function Dashboard() {
       setResult(aiResult);
 
     } catch (err) {
-      setResultError(err.message || 'Analysis failed. Please try again.');
+      if (!navigator.onLine) {
+         setResultError('You are offline. Please reconnect to internet for AI analysis.');
+      } else {
+         setResultError(err.message || 'Analysis failed. Please try again.');
+      }
     } finally {
       setUploading(false);
     }
   };
 
-  // View history item
   const viewHistoryItem = (item) => {
     if (item.results && item.results.length > 0) {
       const r = item.results[0];
       setResult({
         disease: r.disease,
         symptoms: r.symptoms,
-        remedy: r.remedy,
+        severity: r.severity,
+        remedy_chemical: r.remedy_chemical,
+        remedy_organic: r.remedy_organic,
         prevention: r.prevention,
         confidence: r.confidence
       });
       setPreviewUrl(item.image_url);
+      setSelectedFile(null); // Assuming viewing history
       setActiveTab('upload');
     }
   };
@@ -260,36 +293,55 @@ export default function Dashboard() {
                   <p>{t('dash_upload_desc')}</p>
                 </div>
 
-                {/* Upload Zone */}
-                <div
-                  className={`upload-zone ${dragover ? 'dragover' : ''}`}
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleFileSelect}
-                    style={{ display: 'none' }}
-                    id="file-upload"
-                  />
-                  
-                  {!previewUrl ? (
-                    <>
-                      <span className="upload-icon">📸</span>
-                      <h3>{t('dash_upload_btn')}</h3>
-                      <p>{t('dash_upload_hint')}</p>
-                    </>
-                  ) : (
+                {/* Upload Zone & Camera */}
+                {showCamera ? (
+                  <CameraCapture onCapture={handleCameraCapture} onCancel={() => setShowCamera(false)} />
+                ) : !previewUrl ? (
+                  <div
+                    className={`upload-zone ${dragover ? 'dragover' : ''}`}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                      id="file-upload"
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', alignItems: 'center' }}>
+                      <div style={{
+                        width: '80px', height: '80px', borderRadius: 'var(--radius-full)', background: 'linear-gradient(135deg, var(--green-600), var(--cyan-500))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', boxShadow: 'var(--glow-green)'
+                      }}>
+                        📸
+                      </div>
+                      <h3 style={{ fontSize: 'var(--fs-2xl)', marginTop: 'var(--space-2)' }}>Live Camera Detection</h3>
+                      <p style={{ color: 'var(--text-secondary)' }}>Instantly diagnose your crops offline or online.</p>
+                      <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
+                        <button className="btn btn-primary btn-lg" onClick={() => setShowCamera(true)}>
+                          Open Camera
+                        </button>
+                        <button className="btn btn-secondary btn-lg" onClick={() => fileInputRef.current?.click()}>
+                          Upload Image
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="upload-zone">
                     <div className="upload-preview" onClick={e => e.stopPropagation()}>
                       <img src={previewUrl} alt="Crop preview" />
                       <button className="remove-btn" onClick={removeFile}>✕</button>
                     </div>
-                  )}
-                </div>
+                    <div style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
+                        <button className="btn btn-secondary" onClick={removeFile}>
+                          Retake Photo
+                        </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Analyze Button */}
                 {selectedFile && !uploading && (
@@ -337,11 +389,43 @@ export default function Dashboard() {
                             {result.disease === 'Healthy' ? `✅ ${t('result_healthy')}` : `🔍 ${result.disease}`}
                           </h3>
                         </div>
-                        {result.confidence && (
-                          <span className="result-confidence">
-                            📊 {result.confidence}%
-                          </span>
-                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          {result.confidence && (
+                            <span className="result-confidence">
+                              📊 {result.confidence}%
+                            </span>
+                          )}
+                          {result.severity && result.disease !== 'Healthy' && (
+                            <span style={{
+                              background: result.severity === 'High' ? 'rgba(239,68,68,0.2)' : result.severity === 'Medium' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)',
+                              color: result.severity === 'High' ? 'var(--red-400)' : result.severity === 'Medium' ? 'var(--yellow-400)' : 'var(--green-400)',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>
+                              {t('result_severity')}: {result.severity}
+                            </span>
+                          )}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if ('speechSynthesis' in window) {
+                                window.speechSynthesis.cancel();
+                                const text = `${result.disease}. ${result.symptoms}. ${t('result_chemical_remedy')}: ${result.remedy_chemical || result.remedy}. ${t('result_organic_remedy')}: ${result.remedy_organic || result.remedy}`;
+                                const msg = new SpeechSynthesisUtterance(text);
+                                msg.lang = language === 'ta' ? 'ta-IN' : 'en-US';
+                                window.speechSynthesis.speak(msg);
+                              }
+                            }}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', marginTop: '4px', padding: '4px'
+                            }}
+                            title="Listen"
+                          >
+                            🔊
+                          </button>
+                        </div>
                       </div>
 
                       {result.disease === 'Healthy' ? (
@@ -362,10 +446,18 @@ export default function Dashboard() {
                           </div>
 
                           <div className="result-section">
-                            <div className="result-section-icon remedy">💊</div>
+                            <div className="result-section-icon remedy">🧪</div>
                             <div className="result-section-content">
-                              <h4>{t('result_remedy')}</h4>
-                              <p>{result.remedy}</p>
+                              <h4>{t('result_chemical_remedy')}</h4>
+                              <p>{result.remedy_chemical || result.remedy}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="result-section">
+                            <div className="result-section-icon remedy">🌿</div>
+                            <div className="result-section-content">
+                              <h4>{t('result_organic_remedy')}</h4>
+                              <p>{result.remedy_organic || result.remedy}</p>
                             </div>
                           </div>
 
