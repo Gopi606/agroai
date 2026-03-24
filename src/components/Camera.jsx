@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 
-const CameraCapture = ({ onCapture, onCancel }) => {
+const Camera = ({ onCapture, onCancel }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
@@ -209,4 +209,4 @@ const CameraCapture = ({ onCapture, onCancel }) => {
   );
 };
 
-export default CameraCapture;
+export default Camera;

@@ -6,6 +6,7 @@ import { uploadImage, saveUploadRecord, saveResult, getHistory, getLocalImageUrl
 import { getNotifications, getDefaultNotifications, getSeasonalAdvice } from '../services/notificationService';
 import LoadingSpinner from '../components/LoadingSpinner';
 import MarketPrediction from '../components/MarketPrediction';
+import Camera from '../components/Camera';
 
 export default function Dashboard() {
   const { user, userProfile } = useAuth();
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [dragover, setDragover] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
 
   // Result state
   const [result, setResult] = useState(null);
@@ -261,35 +263,58 @@ export default function Dashboard() {
                 </div>
 
                 {/* Upload Zone */}
-                <div
-                  className={`upload-zone ${dragover ? 'dragover' : ''}`}
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleFileSelect}
-                    style={{ display: 'none' }}
-                    id="file-upload"
-                  />
-                  
-                  {!previewUrl ? (
-                    <>
-                      <span className="upload-icon">📸</span>
-                      <h3>{t('dash_upload_btn')}</h3>
-                      <p>{t('dash_upload_hint')}</p>
-                    </>
-                  ) : (
-                    <div className="upload-preview" onClick={e => e.stopPropagation()}>
-                      <img src={previewUrl} alt="Crop preview" />
-                      <button className="remove-btn" onClick={removeFile}>✕</button>
-                    </div>
-                  )}
-                </div>
+                {showCamera ? (
+                  <div style={{ marginBottom: 'var(--space-6)' }}>
+                    <Camera 
+                      onCapture={(file) => {
+                        processFile(file);
+                        setShowCamera(false);
+                      }}
+                      onCancel={() => setShowCamera(false)}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className={`upload-zone ${dragover ? 'dragover' : ''}`}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                      id="file-upload"
+                    />
+                    
+                    {!previewUrl ? (
+                      <>
+                        <span className="upload-icon">📸</span>
+                        <h3>{t('dash_upload_btn')}</h3>
+                        <p>{t('dash_upload_hint')}</p>
+                        <div 
+                          style={{ marginTop: 'var(--space-6)' }} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCamera(true);
+                          }}
+                        >
+                          <button className="btn btn-secondary" type="button">
+                            📹 Open Camera
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="upload-preview" onClick={e => e.stopPropagation()}>
+                        <img src={previewUrl} alt="Crop preview" />
+                        <button className="remove-btn" onClick={removeFile}>✕</button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Analyze Button */}
                 {selectedFile && !uploading && (
