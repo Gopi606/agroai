@@ -5,12 +5,14 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState('');
   const [isScanning, setIsScanning] = useState(true);
   const liveIntervalRef = useRef(null);
 
   const startCamera = useCallback(async () => {
     setError('');
+    setIsReady(false);
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
     }
@@ -22,14 +24,40 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       });
       setStream(mediaStream);
       if (videoRef.current) {
+        // Explicitly set muted & playsInline for strict mobile browsers (iOS Safari)
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.setAttribute('muted', 'true');
         videoRef.current.srcObject = mediaStream;
+        
         videoRef.current.onloadedmetadata = () => {
-          setCameraActive(true);
+          videoRef.current.play()
+            .then(() => {
+              setCameraActive(true);
+              // Ensure video actually has dimensions before declaring ready
+              const checkDimensions = () => {
+                if (videoRef.current && videoRef.current.videoWidth > 0) {
+                  setIsReady(true);
+                } else {
+                  requestAnimationFrame(checkDimensions);
+                }
+              };
+              checkDimensions();
+            })
+            .catch((err) => {
+              console.error('Video play failed:', err);
+              setError('Failed to play video feed. Check browser permissions.');
+            });
         };
       }
     } catch (err) {
       console.error('Error accessing camera:', err);
-      setError('Permission denied');
+      if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+        setError('Camera permission denied. Please allow access in your browser settings.');
+      } else if (err.name === 'NotFoundError') {
+        setError('No camera device found on this device.');
+      } else {
+        setError(`Camera error: ${err.message}`);
+      }
       setCameraActive(false);
     }
   }, []);
@@ -108,6 +136,8 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       position: 'relative', 
       width: '100%', 
       maxWidth: '600px', 
+      height: '60vh',
+      minHeight: '400px',
       margin: '0 auto', 
       borderRadius: 'var(--radius-2xl)', 
       overflow: 'hidden', 
@@ -116,14 +146,26 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       boxShadow: 'var(--glow-green-intense)'
     }}>
       {error ? (
-        <div style={{ padding: 'var(--space-8)', color: 'var(--red-400)', textAlign: 'center' }}>
+        <div style={{ padding: 'var(--space-8)', color: 'var(--red-400)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
           <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>⚠️</div>
           <p style={{ fontSize: 'var(--fs-lg)' }}>{error}</p>
-          <button className="btn btn-primary" onClick={onCancel} style={{ marginTop: 'var(--space-6)' }}>Go Back</button>
+          <button className="btn btn-primary" onClick={handleCancel} style={{ marginTop: 'var(--space-6)' }}>Go Back</button>
+        </div>
+      ) : !isReady ? (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--green-400)', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ 
+            width: '40px', 
+            height: '40px', 
+            border: '4px solid rgba(16, 185, 129, 0.2)', 
+            borderTopColor: 'var(--green-400)', 
+            borderRadius: '50%', 
+            animation: 'spin 1s linear infinite' 
+          }}></div>
+          <p>Initializing Camera...</p>
         </div>
       ) : (
         <>
-          {cameraActive && (
+          {cameraActive && isReady && (
             <div style={{
               position: 'absolute',
               inset: 0,
@@ -156,16 +198,21 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
             ref={videoRef} 
             autoPlay 
             playsInline 
+            muted  // CRITICAL: muted allows autoPlay on mobile devices
             style={{ 
               width: '100%', 
-              height: 'auto', 
-              display: cameraActive ? 'block' : 'none',
+              height: '100%', 
+              minHeight: '400px', // Fallback minimum height
+              display: isReady ? 'block' : 'none',
               objectFit: 'cover',
-              aspectRatio: '4/3'
+              position: 'absolute', // Prevents CSS collapse
+              top: 0,
+              left: 0,
+              zIndex: 1
             }}
           />
           
-          {cameraActive && (
+          {cameraActive && isReady && (
             <div className="camera-controls" style={{
               position: 'absolute',
               bottom: 0,

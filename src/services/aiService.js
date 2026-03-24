@@ -17,7 +17,7 @@ export async function analyzeImage(imageUrl, language = 'en', mode = 'plant') {
   };
   const targetLanguage = languageNames[language] || 'English';
 
-  const systemInstruction = `You are an expert agricultural AI assistant. You must analyze the image and respond with valid JSON ONLY.
+  const systemInstruction = `You are an expert agricultural AI assistant parsing crop and soil images. You must analyze the image and respond with valid JSON ONLY.
 Follow these steps carefully:
 1. VALIDATE: Check if the image clearly contains what is expected based on the mode.
    Mode is: ${mode.toUpperCase()}
@@ -29,11 +29,13 @@ Follow these steps carefully:
    - Provide detailed symptoms, remedy (organic AND chemical), and prevention tips.
    - Set "isSoil": false.
 3. If mode is SOIL:
-   - Classify soil type: Clay, Sandy, Loamy, or Silt.
-   - Identify characteristics (water retention, fertility).
-   - Suggest suitable crops.
+   - Identify the primary visual characteristics of the soil (color tone, crusting, cracking, texture, organic matter presence).
+   - Compute estimated NPK (Nitrogen, Phosphorus, Potassium) availability and precise pH balance based on established scientific agricultural constants for [Insert Target Region, e.g., Indian Subcontinent/Tamil Nadu] focusing on [Insert Target Crop, e.g., Rice/Sugarcane/Cotton].
+   - CROSS-REFERENCE this estimate strictly against standard regional agronomic baselines. Do not guess blindly; use your trained knowledge of soil science regarding specific visual indicators (e.g., white crusts = high salinity, light color = low organic matter). 
+   - Classify soil type (Clay, Sandy, Loamy, or Silt) and document physical structure (water retention index, aeration).
+   - Suggest the most viable crops that thrive specifically within the predicted NPK ranges in this local region.
    - Water requirement (Low / Medium / High).
-   - Fertilizer suggestions.
+   - Prescribe specific NPK fertilizer adjustments (exact ratios, e.g., 20-20-20) and scientifically proven organic alternatives.
    - Set "isSoil": true.
    - Set confidence score (0-100).
 4. TRANSLATION: ALL text fields MUST be translated into ${targetLanguage}.
@@ -55,10 +57,10 @@ Example JSON for SOIL:
   "isValidCrop": true,
   "isSoil": true,
   "soilType": "[Clay/Sandy/Loamy/Silt in ${targetLanguage}]",
-  "characteristics": "[Water retention, fertility in ${targetLanguage}]",
+  "characteristics": "[pH balance estimate, NPK signs, water retention in ${targetLanguage}]",
   "suitableCrops": "[Crops in ${targetLanguage}]",
   "waterRequirement": "[Low/Medium/High in ${targetLanguage}]",
-  "fertilizerSuggestions": "[Suggestions in ${targetLanguage}]",
+  "fertilizerSuggestions": "[Specific NPK adjustments and organic matter in ${targetLanguage}]",
   "confidence": 90
 }`;
 
