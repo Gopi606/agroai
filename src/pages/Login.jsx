@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function Login() {
   const { t } = useLanguage();
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleChange = (e) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -119,10 +125,11 @@ export default function Login() {
               setLoading(true);
               try {
                 await signInWithGoogle();
-                navigate('/dashboard');
+                // We do not navigate here manually because signInWithRedirect 
+                // will transition the page away from our app completely.
+                // The useEffect mapped to `user` will handle post-redirect UI.
               } catch (err) {
-                setError('Login failed');
-              } finally {
+                setError('Google Login failed');
                 setLoading(false);
               }
             }}

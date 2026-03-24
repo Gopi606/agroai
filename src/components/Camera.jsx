@@ -151,20 +151,26 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
           <p style={{ fontSize: 'var(--fs-lg)' }}>{error}</p>
           <button className="btn btn-primary" onClick={handleCancel} style={{ marginTop: 'var(--space-6)' }}>Go Back</button>
         </div>
-      ) : !isReady ? (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--green-400)', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ 
-            width: '40px', 
-            height: '40px', 
-            border: '4px solid rgba(16, 185, 129, 0.2)', 
-            borderTopColor: 'var(--green-400)', 
-            borderRadius: '50%', 
-            animation: 'spin 1s linear infinite' 
-          }}></div>
-          <p>Initializing Camera...</p>
-        </div>
       ) : (
         <>
+          {!isReady && (
+            <div style={{ 
+              position: 'absolute', inset: 0,
+              display: 'flex', justifyContent: 'center', alignItems: 'center', 
+              backgroundColor: 'var(--bg-secondary)', color: 'var(--green-400)', 
+              flexDirection: 'column', gap: '1rem', zIndex: 30 
+            }}>
+              <div style={{ 
+                width: '40px', 
+                height: '40px', 
+                border: '4px solid rgba(16, 185, 129, 0.2)', 
+                borderTopColor: 'var(--green-400)', 
+                borderRadius: '50%', 
+                animation: 'spin 1s linear infinite' 
+              }}></div>
+              <p>Initializing Camera...</p>
+            </div>
+          )}
           {cameraActive && isReady && (
             <div style={{
               position: 'absolute',
@@ -203,12 +209,13 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
               width: '100%', 
               height: '100%', 
               minHeight: '400px', // Fallback minimum height
-              display: isReady ? 'block' : 'none',
+              display: 'block',
               objectFit: 'cover',
               position: 'absolute', // Prevents CSS collapse
               top: 0,
               left: 0,
-              zIndex: 1
+              zIndex: 1,
+              opacity: isReady ? 1 : 0
             }}
           />
           

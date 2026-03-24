@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { auth, googleProvider, signInWithPopup, firebaseSignOut } from '../lib/firebase';
+import { auth, googleProvider, signInWithRedirect, firebaseSignOut } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const AuthContext = createContext({});
@@ -45,8 +45,10 @@ export function AuthProvider({ children }) {
 
   const signInWithGoogle = async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      return { data: { user: result.user } };
+      // Using Redirect instead of Popup to bypass mobile browser popup blockers
+      await signInWithRedirect(auth, googleProvider);
+      // The browser will redirect away. The logic in Login.jsx and onAuthStateChanged will handle the return trip.
+      return { data: { user: null } };
     } catch (error) {
       console.error("Google sign in error:", error);
       // Fallback behavior if Firebase is not properly configured
