@@ -3,8 +3,7 @@ const AI_API_KEY = import.meta.env.VITE_AI_API_KEY;
 
 export async function analyzeImage(imageUrl, language = 'en', mode = 'plant') {
   if (!AI_API_KEY || AI_API_KEY === 'your_grok_api_key_here' || AI_API_KEY === 'your_groq_api_key_here') {
-    // Return demo data when API key not configured
-    return getDemoResult(language, mode);
+    throw new Error('Detection failed (API key missing)');
   }
 
   const languageNames = {
@@ -25,7 +24,9 @@ Follow these steps carefully:
    - If mode is SOIL: Image must contain ANY form of soil, dirt, compost, sand, or land (even if it is inside a bag, cup, hand, or container). If valid, set "isValidCrop": true, "isSoil": true. If it is completely unrelated (e.g., a car, a face), return EXACTLY {"isValidCrop": false, "isSoil": false}.
 
 2. If mode is PLANT and valid:
+   - Identify the specific plant/crop name (e.g. Tomato, Corn) and output it as "crop".
    - Identify the specific crop disease. If healthy, set disease to "Healthy". Assess severity as "Low", "Medium", or "High".
+   - Detect if multiple leaves exist in the image. If true, set "multiLeaf": true and focus on the center region OR largest leaf.
    - Provide detailed symptoms, remedy (organic AND chemical), and prevention tips.
    - Set confidence score (0-100).
 
@@ -49,6 +50,8 @@ Example JSON for PLANT:
 {
   "isValidCrop": true,
   "isSoil": false,
+  "multiLeaf": false,
+  "crop": "[Crop Name in ${targetLanguage}]",
   "disease": "[Disease Name in ${targetLanguage}]",
   "confidence": 85,
   "severity": "[Low/Medium/High in ${targetLanguage}]",
@@ -108,17 +111,16 @@ Example JSON for SOIL:
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
-      console.warn(`AI API Warning: ${errorMessage}. Falling back to demo results.`);
-      // If we hit a rate limit or other API error, fallback to demo results gracefully
-      return getDemoResult(language, mode);
+      console.warn(`AI API Warning: ${errorMessage}`);
+      throw new Error("Detection failed");
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      console.warn('No response from AI. Falling back to demo results.');
-      return getDemoResult(language, mode);
+      console.warn('No response from AI');
+      throw new Error("Detection failed");
     }
 
     // Parse the JSON response
@@ -132,6 +134,7 @@ Example JSON for SOIL:
         isValidCrop: result.isValidCrop !== false,
         isSoil: !!result.isSoil,
         multiLeaf: !!result.multiLeaf,
+        crop: result.crop || 'Unknown Crop',
         severity: result.severity || 'Unknown',
         disease: result.disease || 'Unknown',
         symptoms: result.symptoms || 'Unable to determine symptoms',
@@ -151,6 +154,7 @@ Example JSON for SOIL:
         isValidCrop: !content.includes('"isValidCrop": false') && !content.toLowerCase().includes('not a crop') && !content.toLowerCase().includes('not soil'),
         isSoil: isSoil,
         multiLeaf: content.includes('"multiLeaf": true') || content.toLowerCase().includes('multiple leaves'),
+        crop: extractField(content, 'crop') || 'Unknown Crop',
         severity: extractField(content, 'severity') || 'Unknown',
         disease: extractField(content, 'disease') || 'Analysis Complete',
         symptoms: extractField(content, 'symptoms') || content.substring(0, 200),
@@ -165,8 +169,8 @@ Example JSON for SOIL:
       };
     }
   } catch (error) {
-    console.warn(`AI Analysis Error: ${error.message}. Falling back to demo results.`);
-    return getDemoResult(language, mode);
+    console.warn(`AI Analysis Error: ${error.message}`);
+    throw new Error("Detection failed");
   }
 }
 
@@ -194,34 +198,4 @@ async function blobUrlToBase64(blobUrl) {
   });
 }
 
-function getDemoResult(language, mode) {
-  // Simulate API delay
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (mode === 'soil') {
-        resolve({
-          isValidCrop: true,
-          isSoil: true,
-          soilType: language === 'en' ? 'Loamy Soil' : 'களிமண் நடுத்தர மண் (Loamy)',
-          characteristics: language === 'en' ? 'Good drainage, nutrient-rich, ideal for most plants.' : 'நல்ல நீர்ப்பிடிப்பு, சத்து மிகுந்தது.',
-          suitableCrops: language === 'en' ? 'Wheat, Sugarcane, Cotton, Vegetables' : 'கோதுமை, கரும்பு, பருத்தி, காய்கறிகள்',
-          waterRequirement: language === 'en' ? 'Medium' : 'நடுத்தரம்',
-          fertilizerSuggestions: language === 'en' ? 'Organic compost, NPK 10-10-10' : 'இயற்கை உரம், NPK 10-10-10',
-          confidence: 90
-        });
-      } else {
-        resolve({
-          isValidCrop: true,
-          isSoil: false,
-          multiLeaf: false,
-          severity: 'High',
-          disease: language === 'en' ? 'Late Blight' : 'தாமதமான கருகல் (Late Blight)',
-          symptoms: language === 'en' ? 'Dark brown spots on leaves, white mold on undersides.' : 'இலைகளில் அடர் பழுப்பு புள்ளிகள்.',
-          remedy: language === 'en' ? 'Apply copper-based fungicide.' : 'செம்பு அடிப்படையிலான பூஞ்சைக்கொல்லியை பயன்படுத்தவும்.',
-          prevention: language === 'en' ? 'Use disease-resistant varieties.' : 'நோய் எதிர்ப்பு ரகங்களை பயன்படுத்தவும்.',
-          confidence: 94
-        });
-      }
-    }, 2000);
-  });
-}
+

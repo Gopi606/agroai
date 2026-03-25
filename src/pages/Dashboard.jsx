@@ -572,7 +572,7 @@ export default function Dashboard() {
                             <div className="result-header">
                               <div>
                                 <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-                                  {t('result_disease')}
+                                  {t('result_disease')} {result.crop && result.crop !== 'Unknown Crop' ? `• Plant Type: ${result.crop}` : ''}
                                 </p>
                                 <h3 className="result-disease" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                                   {result.disease === 'Healthy' ? `✅ ${t('result_healthy')}` : `🔍 ${result.disease}`}
