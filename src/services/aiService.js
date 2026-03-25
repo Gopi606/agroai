@@ -30,8 +30,8 @@ Follow these steps carefully:
    - Set confidence score (0-100).
 
 3. If mode is SOIL and valid:
-   - Identify the primary visual characteristics of the soil (color tone, crusting, cracking, texture, organic matter presence).
-   - Classify soilType strictly as one of: "Clay", "Sandy", "Loamy", or "Silt".
+   - Identify the primary visual characteristics of the soil (color tone, crusting, cracking, texture, organic matter presence, grain size).
+   - Accurately classify the specific soilType (e.g., Red, Black, Alluvial, Laterite, Desert, Peaty, Saline, Clay, Sandy, Loamy, Silt, Chalky, etc.). Do NOT restrict to just a few types; identify the exact soil type based on visual evidence, and be highly consistent for similar images.
    - Based on visual indicators, estimate precise pH balance and NPK (Nitrogen, Phosphorus, Potassium) availability.
    - Suggest the most viable crops that thrive specifically within these conditions.
    - Prescribe specific NPK fertilizer adjustments and scientifically proven organic alternatives.
@@ -56,7 +56,7 @@ Example JSON for SOIL:
 {
   "isValidCrop": true,
   "isSoil": true,
-  "soilType": "[Clay/Sandy/Loamy/Silt in ${targetLanguage}]",
+  "soilType": "[Specific Soil Type (e.g., Red, Black, Alluvial, Loamy, etc.) in ${targetLanguage}]",
   "characteristics": "[pH balance estimate, NPK signs, water retention in ${targetLanguage}]",
   "suitableCrops": "[Crops in ${targetLanguage}]",
   "waterRequirement": "[Low/Medium/High in ${targetLanguage}]",
@@ -82,7 +82,7 @@ Example JSON for SOIL:
         'Authorization': `Bearer ${AI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'llama-3.2-90b-vision-preview',
         messages: [
           {
             role: 'user',
