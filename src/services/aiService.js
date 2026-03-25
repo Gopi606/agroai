@@ -1,10 +1,21 @@
 const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
 const AI_API_KEY = import.meta.env.VITE_AI_API_KEY;
+import { processLocally } from './localAnalysis';
+
+let lastApiCallTime = 0;
 
 export async function analyzeImage(imageUrl, language = 'en', mode = 'plant') {
   if (!AI_API_KEY || AI_API_KEY === 'your_grok_api_key_here' || AI_API_KEY === 'your_groq_api_key_here') {
-    throw new Error('Detection failed (API key missing)');
+    return processLocally(imageUrl, language, mode);
   }
+
+  const now = Date.now();
+  if (now - lastApiCallTime < 3000) {
+    console.log("Using offline analysis mode");
+    return processLocally(imageUrl, language, mode);
+  }
+  
+  lastApiCallTime = now;
 
   const languageNames = {
     'en': 'English',
@@ -109,24 +120,25 @@ Example JSON for SOIL:
     });
 
     if (!response.ok) {
+      if (response.status === 429) {
+        console.warn('Using offline analysis mode');
+        return processLocally(imageUrl, language, mode);
+      }
       const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
-      console.warn(`AI API Warning: ${errorMessage}`);
-      console.warn(`Response status: ${response.status}, error data:`, errorData);
-      throw new Error(`Detection failed: ${errorMessage}`);
+      console.warn(`AI API Error: ${errorData.error?.message || response.status}. Using offline analysis mode.`);
+      return processLocally(imageUrl, language, mode);
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      console.warn('No response from AI');
-      throw new Error("Detection failed");
+      console.warn('No response from AI, switching to offline processing.');
+      return processLocally(imageUrl, language, mode);
     }
 
     // Parse the JSON response
     try {
-      // Extract JSON from markdown code blocks if present
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
       const cleanedContent = jsonMatch[1].trim();
       const result = JSON.parse(cleanedContent);
@@ -146,10 +158,11 @@ Example JSON for SOIL:
         suitableCrops: result.suitableCrops || '',
         waterRequirement: result.waterRequirement || '',
         fertilizerSuggestions: result.fertilizerSuggestions || '',
-        confidence: result.confidence || 75
+        confidence: result.confidence || 75,
+        isLocal: false
       };
     } catch (parseError) {
-      // If JSON parsing fails, try to extract info from plain text
+      // If JSON fails, extract info from plain text
       const isSoil = content.includes('"isSoil": true') || content.toLowerCase().includes('soil type');
       return {
         isValidCrop: !content.includes('"isValidCrop": false') && !content.toLowerCase().includes('not a crop') && !content.toLowerCase().includes('not soil'),
@@ -166,12 +179,13 @@ Example JSON for SOIL:
         suitableCrops: extractField(content, 'suitableCrops') || '',
         waterRequirement: extractField(content, 'waterRequirement') || '',
         fertilizerSuggestions: extractField(content, 'fertilizerSuggestions') || '',
-        confidence: parseInt(extractField(content, 'confidence')) || 70
+        confidence: parseInt(extractField(content, 'confidence')) || 70,
+        isLocal: false
       };
     }
   } catch (error) {
-    console.warn(`AI Analysis Error: ${error.message}`);
-    throw new Error(error.message || "Detection failed");
+    console.warn(`AI Analysis Exception: ${error.message}. Using offline analysis mode.`);
+    return processLocally(imageUrl, language, mode);
   }
 }
 

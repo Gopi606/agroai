@@ -189,7 +189,9 @@ export default function Dashboard() {
     if (processingLiveRef.current) return;
     processingLiveRef.current = true;
     try {
-      const aiResult = await analyzeImage(imageUrl, language, scanMode);
+      // Process locally first for live frames to avoid API rate limits
+      const { processLocally } = await import('../services/localAnalysis');
+      const aiResult = await processLocally(imageUrl, language, scanMode);
       setResult(aiResult);
       setResultError('');
     } catch (err) {
@@ -454,9 +456,9 @@ export default function Dashboard() {
                         <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
                           <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>❓</div>
                           <h3 style={{ color: 'var(--red-400)', marginBottom: 'var(--space-2)' }}>
-                            {scanMode === 'soil' ? 'Soil not detected' : t('result_not_crop')}
+                            {scanMode === 'soil' ? 'Unable to clearly detect soil. Try focusing closer' : t('result_not_crop')}
                           </h3>
-                          <p>{scanMode === 'soil' ? 'Please ensure the image contains clear soil.' : t('result_not_crop_msg')}</p>
+                          <p>{scanMode === 'soil' ? '' : t('result_not_crop_msg')}</p>
                         </div>
                       </div>
                     ) : result.confidence < 60 ? (
@@ -617,40 +619,25 @@ export default function Dashboard() {
                               </div>
                             </div>
 
-                            {result.disease === 'Healthy' ? (
-                              <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-                                <div style={{ fontSize: '4rem', marginBottom: 'var(--space-4)' }}>🎉</div>
-                                <p style={{ color: 'var(--green-400)', fontSize: 'var(--fs-lg)' }}>
-                                  {t('result_healthy_msg')}
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="result-sections">
-                                <div className="result-section">
-                                  <div className="result-section-icon symptoms">⚠️</div>
-                                  <div className="result-section-content">
-                                    <h4>{t('result_symptoms')}</h4>
-                                    <p>{result.symptoms}</p>
-                                  </div>
-                                </div>
-
-                                <div className="result-section">
-                                  <div className="result-section-icon remedy">💊</div>
-                                  <div className="result-section-content">
-                                    <h4>{t('result_remedy')}</h4>
-                                    <p>{result.remedy}</p>
-                                  </div>
-                                </div>
-
-                                <div className="result-section">
-                                  <div className="result-section-icon prevention">🛡️</div>
-                                  <div className="result-section-content">
-                                    <h4>{t('result_prevention')}</h4>
-                                    <p>{result.prevention}</p>
-                                  </div>
+                            <div className="result-sections">
+                              <div className="result-section">
+                                <div className="result-section-icon symptoms">📊</div>
+                                <div className="result-section-content" style={{ width: '100%' }}>
+                                  <h4>Crops Analysis Result</h4>
+                                  <ul style={{ listStyleType: 'disc', paddingLeft: '20px', lineHeight: '1.8' }}>
+                                    <li><strong>Healthy crops:</strong> {(result.disease === 'Healthy' || result.healthyCrops) ? 'Yes' : 'No'}</li>
+                                    <li><strong>Diseased crops:</strong> {result.disease !== 'Healthy' ? 'Yes' : 'No'}</li>
+                                    {result.disease !== 'Healthy' && (
+                                      <li><strong>Disease type:</strong> {result.disease}</li>
+                                    )}
+                                    {result.soilType && (
+                                      <li><strong>Soil type:</strong> {result.soilType}</li>
+                                    )}
+                                    <li><strong>Recommendation:</strong> {result.remedy || result.prevention || 'Maintain balanced soil nutrients and proper watering.'}</li>
+                                  </ul>
                                 </div>
                               </div>
-                            )}
+                            </div>
                             
                             {smartRec && (
                               <div style={{ 
