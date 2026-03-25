@@ -14,6 +14,82 @@ function analyzeSoilColor(r, g, b) {
   return 'Loamy'; // balanced
 }
 
+export async function validateInput(imageUrl, mode) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      const allImageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let totalPixels = canvas.width * canvas.height;
+      let greenPixels = 0;
+      let brownOrSoilPixels = 0;
+
+      // Sample every 16th byte (every 4th pixel) for speed
+      let sampledCount = 0;
+      for (let i = 0; i < allImageData.length; i += 16) {
+        let r = allImageData[i];
+        let g = allImageData[i+1];
+        let b = allImageData[i+2];
+        sampledCount++;
+
+        // Green leaf check
+        if (g > r + 10 && g > b + 10) {
+          greenPixels++;
+        }
+
+        // Soil Texture/Color check (Brown/Earthy, Clay, Sand)
+        if ((r > g && g > b && r < 200 && r > 40) || 
+            (r > 120 && g > 120 && b > 80 && Math.abs(r-g) < 30) || 
+            (r < 80 && g < 80 && b < 80)) {
+           brownOrSoilPixels++;
+        }
+      }
+
+      const invalidPayload = {
+        isValidCrop: false,
+        isSoil: false,
+        type: 'invalid',
+        message: 'Invalid input. Please show plant leaves or soil clearly.',
+        disease: 'Detection failed',
+        healthyCrops: false,
+        diseasedCrops: false
+      };
+
+      if (mode === 'plant') {
+        if (greenPixels / sampledCount >= 0.15) {
+          resolve({ isValidCrop: true });
+        } else {
+          resolve(invalidPayload);
+        }
+      } else {
+        if (brownOrSoilPixels / sampledCount >= 0.15) {
+          resolve({ isValidCrop: true, isSoil: true });
+        } else {
+          resolve(invalidPayload);
+        }
+      }
+    };
+    img.onerror = () => {
+      resolve({
+        isValidCrop: false,
+        isSoil: false,
+        type: 'invalid',
+        message: 'Invalid input. Please show plant leaves or soil clearly.',
+        disease: 'Detection failed',
+        healthyCrops: false,
+        diseasedCrops: false
+      });
+    };
+    img.src = imageUrl;
+  });
+}
+
 export async function processLocally(imageUrl, language, mode) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -78,7 +154,7 @@ export async function processLocally(imageUrl, language, mode) {
         
         let symptomsStr = 'Green healthy foliage detected.';
         if (healthyCount > 0 && diseasedCount > 0) {
-          symptomsStr = 'Some crops are healthy and some show disease signs. Diseased region detected, Healthy crops present.';
+          symptomsStr = 'Some crops are healthy, some show issues. Diseased region detected, Healthy crops present.';
         } else if (diseasedCount > 0) {
           symptomsStr = 'Multiple regions show signs of disease (' + diseaseStr + ').';
         }

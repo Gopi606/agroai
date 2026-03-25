@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [loadingText, setLoadingText] = useState('');
   const [dragover, setDragover] = useState(false);
   // Input modes
   const [scanMode, setScanMode] = useState('plant'); // 'plant' or 'soil'
@@ -152,11 +153,23 @@ export default function Dashboard() {
     }
     
     setUploading(true);
+    setLoadingText(t('dash_analyzing'));
     setResultError('');
     setResult(null);
 
     try {
       let imageUrl = previewUrl;
+
+      // Validation
+      const { validateInput } = await import('../services/localAnalysis');
+      const validationStatus = await validateInput(imageUrl, scanMode);
+      if (!validationStatus.isValidCrop) {
+        setResult(validationStatus);
+        setUploading(false);
+        return;
+      }
+
+      setLoadingText(scanMode === 'plant' ? 'Crop detected. Analyzing condition...' : 'Soil detected. Analyzing characteristics...');
 
       // Try to upload to Supabase if configured
       try {
@@ -190,7 +203,14 @@ export default function Dashboard() {
     processingLiveRef.current = true;
     try {
       // Process locally first for live frames to avoid API rate limits
-      const { processLocally } = await import('../services/localAnalysis');
+      const { validateInput, processLocally } = await import('../services/localAnalysis');
+      const validationStatus = await validateInput(imageUrl, scanMode);
+      if (!validationStatus.isValidCrop) {
+        setResult(validationStatus);
+        setResultError('');
+        return;
+      }
+
       const aiResult = await processLocally(imageUrl, language, scanMode);
       setResult(aiResult);
       setResultError('');
@@ -430,7 +450,7 @@ export default function Dashboard() {
 
                 {/* Loading */}
                 {uploading && (
-                  <LoadingSpinner text={t('dash_analyzing')} />
+                  <LoadingSpinner text={loadingText || t('dash_analyzing')} />
                 )}
 
                 {/* Error */}
@@ -456,9 +476,9 @@ export default function Dashboard() {
                         <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
                           <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>❓</div>
                           <h3 style={{ color: 'var(--red-400)', marginBottom: 'var(--space-2)' }}>
-                            {scanMode === 'soil' ? 'Unable to clearly detect soil. Try focusing closer' : t('result_not_crop')}
+                            {result.message || 'Invalid input. Please show plant leaves or soil clearly.'}
                           </h3>
-                          <p>{scanMode === 'soil' ? '' : t('result_not_crop_msg')}</p>
+                          <p></p>
                         </div>
                       </div>
                     ) : result.confidence < 60 ? (
