@@ -10,14 +10,33 @@ export async function processImage(source) {
         if (source.size === 0) {
           return reject(new Error("Invalid image"));
         }
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          resolve(reader.result);
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(source);
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Max dimensions logic to prevent API 413 Payload Too Large
+          const MAX_SIZE = 1080;
+          if (width > height && width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          } else if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
         };
-        reader.onerror = () => {
-          reject(new Error("Invalid image"));
-        };
-        reader.readAsDataURL(source);
+        img.onerror = () => reject(new Error("Invalid image"));
+        img.src = objectUrl;
         return;
       }
 
