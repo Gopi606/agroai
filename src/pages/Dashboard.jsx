@@ -189,16 +189,16 @@ export default function Dashboard() {
     }
   };
 
-  const handleAnalyzeLive = async (file) => {
+  const handleAnalyzeLive = async (imageUrl) => {
     if (processingLiveRef.current) return;
     processingLiveRef.current = true;
     try {
-      const imageUrl = getLocalImageUrl(file);
       const aiResult = await analyzeImage(imageUrl, language, scanMode);
       setResult(aiResult);
       setResultError('');
     } catch (err) {
       console.error('Live analysis error', err);
+      setResultError(err.message || 'Live tracking failed.');
     } finally {
       processingLiveRef.current = false;
     }

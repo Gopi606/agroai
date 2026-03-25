@@ -93,11 +93,7 @@ const Camera = ({ onCapture, onCancel, isLive = false, onFrame }) => {
       try {
         const dataUrl = await processImage(videoRef.current);
         if (dataUrl && onFrame) {
-          // fetch to convert to File
-          const res = await fetch(dataUrl);
-          const blob = await res.blob();
-          const file = new File([blob], "live_frame.jpg", { type: "image/jpeg" });
-          onFrame(file);
+          onFrame(dataUrl);
         }
       } catch (err) {
         console.warn('Live capture failed:', err.message);
