@@ -31,7 +31,12 @@ Follow these steps carefully:
 
 3. If mode is SOIL and valid:
    - Identify the primary visual characteristics of the soil (color tone, crusting, cracking, texture, organic matter presence, grain size).
-   - Accurately classify the specific soilType (e.g., Red, Black, Alluvial, Laterite, Desert, Peaty, Saline, Clay, Sandy, Loamy, Silt, Chalky, etc.). Do NOT restrict to just a few types; identify the exact soil type based on visual evidence, and be highly consistent for similar images.
+   - Accurately classify the specific soilType based on these STRICT rules:
+     * If the soil looks visually RED -> Output "Red Soil"
+     * If the soil looks BLACK with BROWN -> Output "Black Soil"
+     * If the soil appears to have too much WATER content and looks sticky/muddy -> Output "Clay Soil"
+     * If the soil looks like BEACH soil, loosely packed and granular -> Output "Sandy Soil"
+     * For any other distinct soil kind -> Output the exact specific soil type (e.g., Alluvial, Peaty).
    - Based on visual indicators, estimate precise pH balance and NPK (Nitrogen, Phosphorus, Potassium) availability.
    - Suggest the most viable crops that thrive specifically within these conditions.
    - Prescribe specific NPK fertilizer adjustments and scientifically proven organic alternatives.
@@ -95,7 +100,6 @@ Example JSON for SOIL:
             ]
           }
         ],
-        response_format: { type: "json_object" },
         max_tokens: 1024,
         temperature: 0.3
       })
