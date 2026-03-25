@@ -144,76 +144,6 @@ export default function Dashboard() {
     setIsPlayingVoice(false);
   };
 
-  // SIMPLE DETECTION LOGIC (WORKING VERSION)
-  const detectType = (image) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Simple variation logic
-        const rand = Math.random();
-        let typeInfo = '';
-        let disease = '';
-        let symptoms = '';
-        let remedy = '';
-        
-        if (scanMode === 'plant') {
-          if (rand > 0.8) {
-            typeInfo = 'Unknown';
-          } else if (rand > 0.4) {
-            typeInfo = 'plant';
-            disease = 'Healthy';
-            symptoms = 'Plant detected. Checking health...';
-            remedy = 'Ensure proper watering and sunlight.';
-          } else {
-            typeInfo = 'plant';
-            disease = 'Leaf Issue';
-            symptoms = 'Possible condition: Leaf issue detected.';
-            remedy = 'Apply organic fungicide and check soil moisture.';
-          }
-        } else {
-          if (rand > 0.8) {
-            typeInfo = 'Unknown';
-          } else if (rand > 0.4) {
-            typeInfo = 'soil';
-            disease = 'Loamy Soil';
-            symptoms = 'Type: Loamy. Water requirement: Medium.';
-            remedy = 'Suitable crops: Wheat, Cotton.';
-          } else {
-            typeInfo = 'soil';
-            disease = 'Sandy Soil';
-            symptoms = 'Type: Sandy. Water requirement: High.';
-            remedy = 'Suitable crops: Potatoes, Carrots.';
-          }
-        }
-
-        if (typeInfo === 'Unknown') {
-          resolve({
-            isValidCrop: false,
-            isSoil: false,
-            crop: 'Unknown',
-            disease: 'No valid plant or soil detected',
-            symptoms: 'Could not detect the target clearly.',
-            remedy: 'Please align the camera properly.',
-            prevention: '',
-            confidence: 0
-          });
-          return;
-        }
-
-        resolve({
-          isValidCrop: true,
-          isSoil: typeInfo === 'soil',
-          crop: typeInfo === 'plant' ? 'Crop' : '',
-          soilType: typeInfo === 'soil' ? disease : '',
-          disease: disease,
-          symptoms: symptoms,
-          remedy: remedy,
-          prevention: '',
-          confidence: Math.floor(Math.random() * 20) + 80
-        });
-      }, 500); // simulate API latency
-    });
-  };
-
   // Analyze image
   const handleAnalyze = async () => {
     if (!selectedFile && !previewUrl) {
@@ -233,8 +163,7 @@ export default function Dashboard() {
         if (user) {
           const upload = await saveUploadRecord(user.id, imageUrl);
 
-          // DO NOT use complex AI first. Use detectType.
-          const aiResult = await detectType(imageUrl);
+          const aiResult = await analyzeImage(imageUrl, language, scanMode);
           
           await saveResult(upload.id, aiResult);
           
@@ -246,8 +175,7 @@ export default function Dashboard() {
         console.warn('Supabase not configured, using demo mode:', supabaseErr);
       }
 
-      // DO NOT use complex AI first. Use detectType.
-      const aiResult = await detectType(imageUrl);
+      const aiResult = await analyzeImage(imageUrl, language, scanMode);
       setResult(aiResult);
 
     } catch (err) {
@@ -261,7 +189,7 @@ export default function Dashboard() {
     if (processingLiveRef.current) return;
     processingLiveRef.current = true;
     try {
-      const aiResult = await detectType(imageUrl);
+      const aiResult = await analyzeImage(imageUrl, language, scanMode);
       setResult(aiResult);
       setResultError('');
     } catch (err) {
