@@ -161,10 +161,10 @@ export default function Dashboard() {
       // Try to upload to Supabase if configured
       try {
         if (user) {
-          imageUrl = await uploadImage(selectedFile, user.id);
+          // Skip redefining imageUrl, use the compressed previewUrl
           const upload = await saveUploadRecord(user.id, imageUrl);
 
-          // Analyze with AI
+          // Analyze with AI using the compressed imageUrl
           const aiResult = await analyzeImage(imageUrl, language, scanMode);
           
           // Save result to DB

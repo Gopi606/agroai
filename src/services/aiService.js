@@ -75,7 +75,7 @@ Example JSON for SOIL:
   try {
     // Convert image to base64 if it's a blob/object URL
     let base64Image = imageUrl;
-    if (imageUrl.startsWith('blob:') || imageUrl.startsWith('data:')) {
+    if (imageUrl.startsWith('blob:')) {
       base64Image = await blobUrlToBase64(imageUrl);
     }
 
@@ -90,7 +90,7 @@ Example JSON for SOIL:
         'Authorization': `Bearer ${AI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'llama-3.2-90b-vision-preview',
         messages: [
           {
             role: 'user',
@@ -112,7 +112,8 @@ Example JSON for SOIL:
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
       console.warn(`AI API Warning: ${errorMessage}`);
-      throw new Error("Detection failed");
+      console.warn(`Response status: ${response.status}, error data:`, errorData);
+      throw new Error(`Detection failed: ${errorMessage}`);
     }
 
     const data = await response.json();
@@ -170,7 +171,7 @@ Example JSON for SOIL:
     }
   } catch (error) {
     console.warn(`AI Analysis Error: ${error.message}`);
-    throw new Error("Detection failed");
+    throw new Error(error.message || "Detection failed");
   }
 }
 
