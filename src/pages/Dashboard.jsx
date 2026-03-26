@@ -35,6 +35,8 @@ export default function Dashboard() {
   const [result, setResult] = useState(null);
   const [resultError, setResultError] = useState('');
   const processingLiveRef = useRef(false);
+  const lastLiveApiCallRef = useRef(0);
+  const lastLiveResultRef = useRef(null);
 
   // History state
   const [history, setHistory] = useState([]);
@@ -211,12 +213,32 @@ export default function Dashboard() {
         return;
       }
 
-      const aiResult = await processLocally(imageUrl, language, scanMode);
-      setResult(aiResult);
+      const now = Date.now();
+      if (now - lastLiveApiCallRef.current > 4500) {
+        lastLiveApiCallRef.current = now;
+        try {
+          const aiResult = await analyzeImage(imageUrl, language, scanMode);
+          lastLiveResultRef.current = aiResult;
+          setResult(aiResult);
+        } catch (apiErr) {
+          if (lastLiveResultRef.current) {
+            setResult(lastLiveResultRef.current);
+          } else {
+            const local = await processLocally(imageUrl, language, scanMode);
+            setResult(local);
+          }
+        }
+      } else if (lastLiveResultRef.current) {
+        setResult(lastLiveResultRef.current);
+      } else {
+        const aiResult = await processLocally(imageUrl, language, scanMode);
+        setResult(aiResult);
+      }
       setResultError('');
     } catch (err) {
       console.error('Live analysis error', err);
-      setResultError(err.message || 'Live tracking failed.');
+      // Suppress technical errors during live scan, just rely on last result
+      setResultError('');
     } finally {
       processingLiveRef.current = false;
     }
@@ -499,7 +521,7 @@ export default function Dashboard() {
                             borderLeft: '4px solid var(--blue-500)',
                             borderRadius: 'var(--radius-md)'
                           }}>
-                            ℹ️ Analyzing main leaf. {t('result_multi_leaf')}
+                            ℹ️ Multiple leaves detected. {result.disease === 'Healthy' ? 'All leaves appear healthy.' : 'Some leaves are healthy, some show disease.'}
                           </div>
                         )}
                         
@@ -590,7 +612,9 @@ export default function Dashboard() {
                             <div className="result-header">
                               <div>
                                 <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-                                  {t('result_disease')} {result.crop && result.crop !== 'Unknown Crop' ? `• Plant Type: ${result.crop}` : ''}
+                                  {result.confidence < 50 
+                                    ? "Crop detected (confidence low)" 
+                                    : `Detected Crop: ${result.crop && result.crop !== 'Unknown Crop' ? result.crop : 'Plant'}`}
                                 </p>
                                 <h3 className="result-disease" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                                   {result.disease === 'Healthy' ? `✅ ${t('result_healthy')}` : `🔍 ${result.disease}`}
@@ -645,15 +669,16 @@ export default function Dashboard() {
                                 <div className="result-section-content" style={{ width: '100%' }}>
                                   <h4>Crops Analysis Result</h4>
                                   <ul style={{ listStyleType: 'disc', paddingLeft: '20px', lineHeight: '1.8' }}>
-                                    <li><strong>Healthy crops:</strong> {(result.disease === 'Healthy' || result.healthyCrops) ? 'Yes' : 'No'}</li>
-                                    <li><strong>Diseased crops:</strong> {result.disease !== 'Healthy' ? 'Yes' : 'No'}</li>
+                                    <li><strong>Crop Name:</strong> {result.crop || 'Plant'}</li>
+                                    <li><strong>Health Status:</strong> {result.disease === 'Healthy' ? 'Healthy' : 'Diseased'}</li>
                                     {result.disease !== 'Healthy' && (
-                                      <li><strong>Disease type:</strong> {result.disease}</li>
+                                      <li><strong>Disease Name:</strong> {result.disease}</li>
                                     )}
+                                    <li><strong>Confidence:</strong> {result.confidence}%</li>
+                                    <li><strong>Solution:</strong> {result.remedy || result.prevention || 'Maintain balanced soil nutrients and proper watering.'}</li>
                                     {result.soilType && (
-                                      <li><strong>Soil type:</strong> {result.soilType}</li>
+                                      <li><strong>Soil Info:</strong> {result.soilType} {result.characteristics ? `- ${result.characteristics}` : ''}</li>
                                     )}
-                                    <li><strong>Recommendation:</strong> {result.remedy || result.prevention || 'Maintain balanced soil nutrients and proper watering.'}</li>
                                   </ul>
                                 </div>
                               </div>
