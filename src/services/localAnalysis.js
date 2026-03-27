@@ -96,61 +96,71 @@ export async function processLocally(imageUrl, language, mode) {
       ctx.drawImage(img, 0, 0);
 
       if (mode === 'plant') {
-        let healthyCount = 0;
-        let diseasedCount = 0;
+        let greenCount = 0;
+        let yellowCount = 0;
+        let spotsCount = 0;
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        
+        // Pixel-by-pixel sampling for much higher accuracy
+        for (let i = 0; i < imageData.length; i += 16) {
+           let r = imageData[i];
+           let g = imageData[i+1];
+           let b = imageData[i+2];
+
+           // Exclude background (pure white, pure black, gray)
+           if (Math.abs(r-g) < 15 && Math.abs(g-b) < 15) continue;
+
+           if (g > r + 15 && g > b + 15) {
+               greenCount++; // Healthy green tissue
+           } else if (r > 130 && g > 130 && b < 100) {
+               yellowCount++; // Yellowing/Chlorosis
+           } else if (
+               (r > 70 && g < 130 && b < 100 && r > g) || // Brown/red/orange spots
+               (r < 80 && g < 80 && b < 80 && (r > 20 || g > 20 || b > 20)) // Dark rot/black spots
+           ) {
+               spotsCount++;
+           }
+        }
+
         let diseaseTypes = new Set();
         let remedies = new Set();
-
-        const regionW = Math.floor(canvas.width / 2);
-        const regionH = Math.floor(canvas.height / 2);
-
-        for (let row = 0; row < 2; row++) {
-          for (let col = 0; col < 2; col++) {
-             const imageData = ctx.getImageData(col * regionW, row * regionH, regionW, regionH).data;
-             let rSum = 0, gSum = 0, bSum = 0, count = 0;
-             for (let i = 0; i < imageData.length; i += 16) {
-               rSum += imageData[i];
-               gSum += imageData[i+1];
-               bSum += imageData[i+2];
-               count++;
-             }
-             const colorType = evaluateColor(rSum/count, gSum/count, bSum/count);
-             if (colorType === 'green') {
-               healthyCount++;
-             } else if (colorType !== 'unknown') {
-               diseasedCount++;
-               if (colorType === 'yellow') {
-                 diseaseTypes.add('Deficiency');
-                 remedies.add('Add required nutrients');
-               } else if (colorType === 'spots') {
-                 diseaseTypes.add('Disease detected (Spots)');
-                 remedies.add('Apply appropriate treatment for spots');
-               }
-             }
-          }
-        }
-
-        let diseaseStr = diseaseTypes.size > 0 ? Array.from(diseaseTypes).join(', ') : 'Healthy';
-        let remedyStr = remedies.size > 0 ? Array.from(remedies).join('. ') : 'Ensure proper watering and sunlight';
         
-        let symptomsStr = 'Green healthy foliage detected.';
-        let isMulti = healthyCount > 0 && diseasedCount > 0;
-        if (isMulti) {
-          symptomsStr = 'Some leaves are healthy, some show disease';
-        } else if (diseasedCount > 0) {
-          symptomsStr = 'Multiple regions show signs of disease (' + diseaseStr + ').';
+        const totalPlantPixels = greenCount + yellowCount + spotsCount;
+        // If we found plant pixels, do proportional check
+        if (totalPlantPixels > 0) {
+           // Even 4% of spots means diseased
+           if (spotsCount > totalPlantPixels * 0.04) {
+               diseaseTypes.add('Leaf Spots / Blight');
+               remedies.add('Apply appropriate fungicide, prune affected leaves');
+           }
+           // 15% yellowing means deficiency
+           if (yellowCount > totalPlantPixels * 0.15) {
+               diseaseTypes.add('Nutrient Deficiency (Yellowing)');
+               remedies.add('Apply nitrogen/iron balanced fertilizer');
+           }
+        } else {
+           // Fallback if no specific plant traits found clearly
+           if (evaluateColor(100, 150, 50) === 'green') {
+               // generic fallback
+           }
         }
+
+        let isHealthy = diseaseTypes.size === 0;
+        let diseaseStr = isHealthy ? 'Healthy' : Array.from(diseaseTypes).join(', ');
+        let remedyStr = isHealthy ? 'Ensure proper watering and sunlight' : Array.from(remedies).join('. ');
+        let symptomsStr = isHealthy ? 'Green healthy foliage detected.' : `Signs of disease detected: ${diseaseStr}.`;
 
         resolve({
           isValidCrop: true,
           isSoil: false,
-          multiLeaf: isMulti,
-          crop: 'Approx. Crop',
+          multiLeaf: false,
+          crop: 'Unknown Crop (Offline Mode)',
           disease: diseaseStr,
-          severity: diseasedCount > 2 ? 'High' : diseasedCount > 0 ? 'Medium' : 'Low',
+          severity: isHealthy ? 'Healthy' : (spotsCount > totalPlantPixels * 0.15 ? 'High' : 'Medium'),
           symptoms: symptomsStr,
           remedy: remedyStr,
-          prevention: 'Maintain balanced soil nutrients and proper watering.',
+          prevention: 'Maintain balanced soil nutrients, proper watering, and good airflow.',
           confidence: 65,
           soilType: '',
           characteristics: '',
@@ -158,8 +168,8 @@ export async function processLocally(imageUrl, language, mode) {
           waterRequirement: '',
           fertilizerSuggestions: '',
           isLocal: true,
-          healthyCrops: healthyCount > 0,
-          diseasedCrops: diseasedCount > 0
+          healthyCrops: isHealthy,
+          diseasedCrops: !isHealthy
         });
 
       } else {
