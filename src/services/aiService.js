@@ -75,43 +75,37 @@ Ensure the values are translated into ${targetLanguage}.`;
     // Remove prefix if exists
     const base64Data = base64Image.includes('base64,') ? base64Image.split('base64,')[1] : base64Image;
 
-    // Use Groq Vision API
-    const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
-    
-    const response = await fetch(AI_API_URL, {
+    // Use Gemini Vision REST API
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${AI_API_KEY}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "llama-3.2-90b-vision-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: systemInstruction },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${base64Data}`
-                }
+        contents: [{
+          parts: [
+            { text: systemInstruction },
+            {
+              inline_data: {
+                mime_type: "image/jpeg",
+                data: base64Data
               }
-            ]
-          }
-        ],
-        temperature: 0.1,
-        response_format: { type: "json_object" }
+            }
+          ]
+        }],
+        generationConfig: {
+           response_mime_type: "application/json",
+        }
       })
     });
 
     if (!response.ok) {
-      console.warn(`AI API Failed with status ${response.status}. Using local fallback.`);
+      console.warn(`AI API Failed with status ${response.status}. Oh no! The API key might be invalid (e.g. using a Groq key for Gemini). Using local fallback.`);
       return processLocally(imageUrl, language, mode);
     }
 
     const data = await response.json();
-    let content = data.choices?.[0]?.message?.content;
+    let content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
       console.warn('No response from AI, switching to local logic.');
