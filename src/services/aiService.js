@@ -28,65 +28,43 @@ export async function analyzeImage(imageUrl, language = 'en', mode = 'plant') {
   };
   const targetLanguage = languageNames[language] || 'English';
 
-  const systemInstruction = `You are a highly accurate agricultural AI specializing in plant disease detection.
+  const systemInstruction = `You are an expert agricultural AI specializing in precise plant disease detection and crop identification.
 
-Your job is to analyze the image and make a FINAL DECISION based ONLY on visible evidence.
+Your job is to analyze the image and make a rigorous evaluation based ON VISIBLE EVIDENCE ONLY.
 
-STEP 1: Identify plant/crop (if visible).
-STEP 2: Carefully check for disease symptoms:
-- Spots (brown, black, yellow, orange)
-- Holes or damage
-- Leaf discoloration
-- Dryness or wilting
-- Fungal patterns or patches
+STEP 1: Identify the SPECIFIC Plant or Crop Name (e.g., "Apple Tree", "Paddy/Rice", "Oleander", "Tomato", etc.). Do not say "Approx. Crop".
+STEP 2: Carefully inspect for ANY disease symptoms:
+- Spots (brown, black, yellow, orange, or rust-colored)
+- Holes, pest damage, or bite marks
+- Leaf discoloration, yellowing (chlorosis), or browning (necrosis)
+- Dryness, wilting, curling, or shriveling
+- Fungal patterns, white/gray powder, or patches
+- Any abnormalities on leaves, stems, or flowers
 
 STEP 3: DECISION LOGIC (MANDATORY):
-- If NO visible symptoms → classify as HEALTHY
-- If ANY clear symptoms → classify as DISEASED
-- DO NOT GUESS
+- If the plant is entirely green/normal with NO symptoms → Health Status: "Healthy", Disease Name: "Healthy".
+- If the image contains vibrant healthy flowers (like pink Oleander) and healthy green leaves → Health Status: "Healthy", Disease Name: "Healthy".
+- If you see ANY clear spots, discoloration, or damage → Health Status: "Diseased", Disease Name: "[Specific Disease Name, e.g., 'Rust', 'Leaf Spot', 'Blight']". DO NOT say healthy if spots exist. 
 
-STEP 4: SELF-VALIDATION (VERY IMPORTANT):
-Before giving final answer, ask yourself:
-"Did I clearly see disease symptoms?"
-- If YES → Disease
-- If NO → Healthy
-- If NOT SURE → say "Low confidence – unclear image"
-
-STEP 5: OUTPUT FORMAT (STRICT):
-
-Plant Name:
-Health Status: (Healthy / Diseased / Unclear)
-Disease Name: (only if diseased, else "None")
-Confidence: (70–95% only, never random like 65%)
-Key Observations:
-Solutions:
-
-RULES:
-- NEVER flip results randomly
-- NEVER say disease without visible proof
-- NEVER say healthy if spots/damage are clearly present
-- Be consistent and logical
-
-Respond in JSON format.
-Ensure your response is valid JSON and translated into ${targetLanguage}.
-Structure your JSON response to match the STRICT OUTPUT FORMAT requirements while mapping to these application keys:
+STEP 4: Respond strictly with VALID JSON matching exactly this structure (no markdown tags):
 {
   "isValidCrop": true,
   "isSoil": false,
   "multiLeaf": false,
-  "crop": "Plant Name",
-  "disease": "Disease Name",
-  "severity": "Health Status",
-  "symptoms": "Key Observations",
-  "remedy": "Solutions",
+  "crop": "Specific Crop Name",
+  "disease": "Specific Disease Name or 'Healthy'",
+  "severity": "Low/Medium/High or 'Healthy'",
+  "symptoms": "Detailed observations of what you see",
+  "remedy": "Actionable solutions",
   "prevention": "Preventive measures",
   "confidence": 95,
-  "soilType": "Identify soil type (only if soil)",
-  "characteristics": "Soil characteristics",
-  "suitableCrops": "Suggest suitable crops",
-  "waterRequirement": "Water requirement",
-  "fertilizerSuggestions": "Fertilizers/Improvements"
-}`;
+  "soilType": "",
+  "characteristics": "",
+  "suitableCrops": "",
+  "waterRequirement": "",
+  "fertilizerSuggestions": ""
+}
+Ensure the values are translated into ${targetLanguage}.`;
 
   try {
     let base64Image = imageUrl;
@@ -97,27 +75,33 @@ Structure your JSON response to match the STRICT OUTPUT FORMAT requirements whil
     // Remove prefix if exists
     const base64Data = base64Image.includes('base64,') ? base64Image.split('base64,')[1] : base64Image;
 
-    // Use Gemini Vision REST API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AI_API_KEY}`, {
+    // Use Groq Vision API
+    const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
+    
+    const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${AI_API_KEY}`
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: systemInstruction },
-            {
-              inline_data: {
-                mime_type: "image/jpeg",
-                data: base64Data
+        model: "llama-3.2-90b-vision-preview",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: systemInstruction },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${base64Data}`
+                }
               }
-            }
-          ]
-        }],
-        generationConfig: {
-           response_mime_type: "application/json",
-        }
+            ]
+          }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
       })
     });
 
@@ -127,7 +111,7 @@ Structure your JSON response to match the STRICT OUTPUT FORMAT requirements whil
     }
 
     const data = await response.json();
-    let content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    let content = data.choices?.[0]?.message?.content;
 
     if (!content) {
       console.warn('No response from AI, switching to local logic.');
@@ -140,8 +124,12 @@ Structure your JSON response to match the STRICT OUTPUT FORMAT requirements whil
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
       result = JSON.parse(jsonMatch[1].trim());
     } catch(e) {
-      // Very basic plain text fallback parsing
-      result = {};
+      // Direct parsing fallback if no markdown wrappers
+      try {
+        result = JSON.parse(content.trim());
+      } catch(err) {
+        result = {};
+      }
     }
 
     return {
